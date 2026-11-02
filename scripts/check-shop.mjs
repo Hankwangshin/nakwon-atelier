@@ -165,13 +165,31 @@ try {
   check("상품 삭제", (await manager(`/api/products/${newId}`, "DELETE")).status === 200);
   check("삭제한 상품은 공개 목록에서 사라짐", !(await guest("/api/products")).body.products.some(({ id }) => id === newId));
   check("삭제한 상품은 장바구니에서도 사라짐", (await userB("/api/cart")).body.lines.length === 0);
-  await userB("/api/auth/logout", "POST");
+
+  // 회원 관리
+  check("비회원 회원 목록 거절", (await guest("/api/admin/members")).status === 401);
+  check("일반 회원 회원 목록 거절", (await userB("/api/admin/members")).status === 403);
+  check("일반 회원의 탈퇴 처리 거절", (await userB(`/api/admin/members/${me.id}`, "DELETE")).status === 403);
+  const memberList = await manager("/api/admin/members");
+  const listedA = memberList.body?.members?.find(({ id }) => id === me.id);
+  check("관리자는 회원 목록을 봄", listedA?.email === accountA.email);
+  check("회원 목록에 연락처를 보내지 않음", listedA && !("phone" in listedA));
+  const adminMember = memberList.body.members.find(({ isAdmin }) => isAdmin);
+  check("관리자 계정은 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
+  check("관리자 계정은 스스로 탈퇴 불가", (await manager("/api/auth/me", "DELETE")).status === 409);
+  check("없는 회원 탈퇴 처리는 404", (await manager("/api/admin/members/00000000-0000-0000-0000-000000000000", "DELETE")).status === 404);
+  await userB("/api/cart", "POST", { productId: "p01", quantity: 1 });
+  check("관리자가 회원 탈퇴 처리", (await manager(`/api/admin/members/${meB.id}`, "DELETE")).status === 200);
+  check("탈퇴 처리된 회원은 바로 로그아웃 상태", (await userB("/api/auth/me")).body.user === null);
+  check("탈퇴 처리된 회원은 로그인 불가", (await guest("/api/auth/login", "POST", { email: accountB.email, password: accountB.password })).status === 401);
+  const { data: bProfile } = await admin.from("profiles").select("id").eq("id", meB.id);
+  const { data: bCart } = await admin.from("cart_items").select("product_id").eq("user_id", meB.id);
+  check("탈퇴 처리 시 회원 정보와 장바구니 삭제", bProfile.length === 0 && bCart.length === 0);
 
   // 탈퇴
-  check("로그아웃 후 정보 없음", await (async () => {
-    await userB("/api/auth/logout", "POST");
-    return (await userB("/api/auth/me")).body.user === null;
-  })());
+  await userA("/api/auth/logout", "POST");
+  check("로그아웃 후 정보 없음", (await userA("/api/auth/me")).body.user === null);
+  check("다시 로그인", (await userA("/api/auth/login", "POST", { email: accountA.email, password: accountA.password })).status === 200);
   check("회원 탈퇴", (await userA("/api/auth/me", "DELETE")).status === 200);
   const { data: profile } = await admin.from("profiles").select("id").eq("id", me.id);
   check("탈퇴 시 회원 정보 삭제", profile.length === 0);

@@ -433,6 +433,7 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 | `/orders` | 결제한 주문 내역 |
 | `/account` | 내 정보, 회원 탈퇴 |
 | `/admin/products` | 관리자 전용 상품 추가, 수정, 삭제 |
+| `/admin/members` | 관리자 전용 회원 목록, 회원 탈퇴 처리 |
 
 ### 결제 흐름
 
@@ -449,6 +450,10 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 ### 상품 관리
 
 `GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 계정 정보는 `.env`의 `ADMIN_LOGIN_EMAIL`, `ADMIN_INITIAL_PASSWORD`에 있다. 그림은 일러스트 10종 중에서 고른다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
+
+### 회원 관리
+
+`GET /api/admin/members`와 `DELETE /api/admin/members/[id]`는 관리자만 쓸 수 있다. 목록에는 이름, 이메일, 가입일, 관리자 여부만 보내고 연락처는 보내지 않는다. 탈퇴 처리는 회원 본인의 탈퇴와 같이 회원 정보와 장바구니를 삭제하고 주문은 회원 연결만 끊어 보관한다. 관리자 계정은 본인 탈퇴와 탈퇴 처리가 모두 막혀 있다.
 
 ### 비밀 값
 

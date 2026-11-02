@@ -64,9 +64,14 @@ export default function SiteHeader() {
           {isLoggedIn ? (
             <>
               {isAdmin && (
-                <Link href="/admin/products" className="text-zinc-600 dark:text-zinc-400">
-                  상품 관리
-                </Link>
+                <>
+                  <Link href="/admin/products" className="text-zinc-600 dark:text-zinc-400">
+                    상품 관리
+                  </Link>
+                  <Link href="/admin/members" className="text-zinc-600 dark:text-zinc-400">
+                    회원 관리
+                  </Link>
+                </>
               )}
               <Link href="/account" className="text-zinc-600 dark:text-zinc-400">
                 내 정보

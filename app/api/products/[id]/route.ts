@@ -1,21 +1,7 @@
-import {
-  errorResponse,
-  logFailure,
-  loginRequiredResponse,
-  serverFailedResponse,
-} from "@/lib/http";
-import { getAdminUser, parseProductInput, toProductRow } from "@/lib/products";
+import { denyUnlessAdmin } from "@/lib/admin";
+import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
+import { parseProductInput, toProductRow } from "@/lib/products";
 import { createAdminClient } from "@/lib/supabase";
-
-async function denyUnlessAdmin() {
-  const { user, isAdmin } = await getAdminUser();
-  if (!user) {
-    return loginRequiredResponse();
-  }
-  return isAdmin
-    ? null
-    : errorResponse("FORBIDDEN", "관리자만 사용할 수 있습니다.", 403);
-}
 
 export async function PATCH(request: Request, context: RouteContext<"/api/products/[id]">) {
   const denied = await denyUnlessAdmin();
