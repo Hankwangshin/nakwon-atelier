@@ -14,14 +14,24 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   kind?: ChatKind;
-  isLocal?: boolean; // 첫 안내와 오류 문구처럼 서버로 보내지 않는 말풍선
+  isLocal?: boolean; // 첫 안내처럼 서버로 보내지 않는 말풍선
+}
+
+// 실패한 질문을 그대로 다시 보낼 수 있도록 함께 기억한다.
+interface FailedRequest {
+  question: string;
+  history: HistoryItem[];
+  message: string;
+  canRetry: boolean;
 }
 
 const WELCOME_MESSAGE =
   "상품을 묻거나, 예산과 받는 사람을 알려 주시면 선물을 추천해요.";
 
-// 작업 8번에서 오류 안내와 "다시 시도" 버튼으로 바꾼다.
-const FAILURE_MESSAGE = "답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const DEFAULT_FAILURE_MESSAGE =
+  "답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const NETWORK_FAILURE_MESSAGE =
+  "서버에 연결하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.";
 
 // Design Ref: §6 — 서버 제한을 넘지 않도록 최근 말풍선만 골라 보낸다.
 function toHistory(messages: ChatMessage[]): HistoryItem[] {
@@ -42,6 +52,7 @@ export default function ChatPanel() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [failedRequest, setFailedRequest] = useState<FailedRequest | null>(null);
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -53,14 +64,54 @@ export default function ChatPanel() {
   // 새 말풍선이 생기면 대화 영역의 맨 아래를 보여 준다.
   useEffect(() => {
     bottomRef.current?.scrollIntoView();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, failedRequest]);
 
   function addMessage(message: Omit<ChatMessage, "id">) {
     const id = nextId.current++;
     setMessages((current) => [...current, { ...message, id }]);
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  // Design Ref: §7 — 입력 오류를 뺀 나머지는 "다시 시도"로 같은 질문을 보낼 수 있다.
+  async function sendQuestion(text: string, history: HistoryItem[]) {
+    setFailedRequest(null);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history }),
+      });
+      const reply = await response.json().catch(() => null);
+
+      if (!response.ok || !reply) {
+        setFailedRequest({
+          question: text,
+          history,
+          message: reply?.error?.message ?? DEFAULT_FAILURE_MESSAGE,
+          canRetry: reply?.error?.code !== "INVALID_INPUT",
+        });
+        return;
+      }
+
+      addMessage({
+        role: "assistant",
+        content: reply.message,
+        kind: reply.kind,
+      });
+    } catch {
+      setFailedRequest({
+        question: text,
+        history,
+        message: NETWORK_FAILURE_MESSAGE,
+        canRetry: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canSend) {
@@ -70,33 +121,7 @@ export default function ChatPanel() {
     const history = toHistory(messages);
     addMessage({ role: "user", content: question });
     setInput("");
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, history }),
-      });
-      if (!response.ok) {
-        throw new Error(`chat request failed: ${response.status}`);
-      }
-
-      const reply = await response.json();
-      addMessage({
-        role: "assistant",
-        content: reply.message,
-        kind: reply.kind,
-      });
-    } catch {
-      addMessage({
-        role: "assistant",
-        content: FAILURE_MESSAGE,
-        isLocal: true,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    sendQuestion(question, history);
   }
 
   return (
@@ -113,6 +138,25 @@ export default function ChatPanel() {
           <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
             답변을 만드는 중
           </p>
+        )}
+        {failedRequest && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400"
+          >
+            <p>{failedRequest.message}</p>
+            {failedRequest.canRetry && (
+              <button
+                type="button"
+                onClick={() =>
+                  sendQuestion(failedRequest.question, failedRequest.history)
+                }
+                className="rounded-lg border border-red-600 px-3 py-1 font-medium dark:border-red-400"
+              >
+                다시 시도
+              </button>
+            )}
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
