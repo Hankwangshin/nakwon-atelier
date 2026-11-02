@@ -307,19 +307,20 @@ interface HistoryItem {
 
 ## 8. 보안
 
-- [ ] OpenAI 호출은 `app/api/chat/route.ts`에서만 하고, 키는 `OPENAI_API_KEY`로 읽는다.
-- [ ] 브라우저 코드에 키가 들어가지 않고, `NEXT_PUBLIC_` 접두사를 쓰지 않는다.
-- [ ] `.env`는 GitHub에 올리지 않고, `.vercelignore`에 `.env*`를 넣어 Vercel CLI 업로드에서도 제외한다.
+- [x] OpenAI 호출은 `app/api/chat/route.ts`에서만 하고, 키는 `OPENAI_API_KEY`로 읽는다.
+- [x] 브라우저 코드에 키가 들어가지 않고, `NEXT_PUBLIC_` 접두사를 쓰지 않는다.
+- [x] `.env`는 GitHub에 올리지 않는다.
+- [ ] `.vercelignore`에 `.env*`를 넣어 Vercel CLI 업로드에서도 제외한다. (작업 18번)
 - [ ] 키가 노출되면 즉시 폐기하고 새 키를 발급받는다.
-- [ ] 오류 기록에는 상태 코드만 남기고 질문과 답변 내용은 남기지 않는다.
-- [ ] 대화 기록은 서버와 데이터베이스에 저장하지 않는다.
-- [ ] 배포 전에 OpenAI의 데이터 보관 정책을 확인하고, 받아들이기 어려우면 배포를 멈춘 뒤 사용자가 결정한다.
+- [x] 오류 기록에는 상태 코드만 남기고 질문과 답변 내용은 남기지 않는다.
+- [x] 대화 기록은 서버와 데이터베이스에 저장하지 않는다.
+- [x] 배포 전에 OpenAI의 데이터 보관 정책을 확인했다. API 입력은 기본적으로 학습에 쓰이지 않지만, 악용 감시 기록이 최대 30일 보관될 수 있다. 받아들이기 어려우면 배포를 멈춘 뒤 사용자가 결정한다.
 - [ ] OpenAI 계정에 결제 한도를 설정한다.
-- [ ] 상품 문서에는 공개 가능한 가상 데이터만 넣고, 내부 자료와 개인정보는 넣지 않는다.
-- [ ] 고객 입력은 문서가 아닌 일반 대화로 전달해, 입력으로 AI 규칙을 바꾸지 못하게 한다.
-- [ ] AI 답변은 글자로만 표시해, 답변 안의 코드가 브라우저에서 실행되지 않게 한다.
+- [x] 상품 문서에는 공개 가능한 가상 데이터만 넣고, 내부 자료와 개인정보는 넣지 않는다.
+- [x] 고객 입력은 문서가 아닌 일반 대화로 전달해, 입력으로 AI 규칙을 바꾸지 못하게 한다.
+- [x] AI 답변은 글자로만 표시해, 답변 안의 코드가 브라우저에서 실행되지 않게 한다.
 
-AI에게 보내는 규칙과 고정 문구는 `lib/chat-prompt.ts`에 모은다. PRD 5번의 규칙과 PRD 7번의 개인정보 규칙(개인정보 요구 금지, 되풀이 금지)을 문구와 숫자 그대로 옮긴다. Nice 1 규칙은 작업 16번에서 넣는다.
+AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는 `lib/verify-reply.ts`에 둔다. 재확인 코드가 OpenAI 없이 단독으로 실행되게 하기 위해서다. PRD 5번의 규칙과 PRD 7번의 개인정보 규칙(개인정보 요구 금지, 되풀이 금지)을 문구와 숫자 그대로 옮긴다.
 
 ## 9. 테스트 계획
 
@@ -406,23 +407,23 @@ my-app/
 ├── app/
 │   ├── layout.tsx            수정: 한국어 설정, 앱 이름
 │   ├── page.tsx              수정: 챗봇 화면 표시
-│   └── api/chat/route.ts     새 파일: 서버 쪽 API
+│   └── api/chat/route.ts     완료: 서버 쪽 API
 ├── components/
-│   ├── ChatPanel.tsx         새 파일: 대화 상태, 입력 영역
-│   ├── MessageBubble.tsx     새 파일: 말풍선
-│   └── ProductCard.tsx       새 파일: 추천 카드
+│   ├── ChatPanel.tsx         완료: 대화 상태, 입력 영역
+│   ├── MessageBubble.tsx     완료: 말풍선
+│   └── ProductCard.tsx       완료: 추천 카드
 ├── data/
 │   └── products.json         완료: 상품 안내 문서
 ├── lib/
 │   ├── types.ts              완료: 데이터 구조 정의 (이후 작업에서 추가)
 │   ├── products.ts           완료: 상품 읽기, 필수 항목 검사
 │   ├── limits.ts             완료: 화면과 서버가 함께 쓰는 글자 수·개수 제한
-│   ├── chat-prompt.ts        새 파일: AI 규칙과 고정 문구
-│   └── verify-reply.ts       새 파일: AI 답변 재확인
+│   ├── chat-prompt.ts        완료: AI 규칙과 답변 양식
+│   └── verify-reply.ts       완료: AI 답변 재확인과 고정 문구
 └── scripts/
-    ├── check-verify.mjs      새 파일: 서버 재확인 점검
-    ├── run-tests.mjs         새 파일: 성공 기준 측정
-    └── test-cases.json       새 파일: 테스트 질문
+    ├── check-verify.mjs      완료: 서버 재확인 점검
+    ├── run-tests.mjs         완료: 성공 기준 측정
+    └── test-cases.json       완료: 테스트 질문
 ```
 
 ### 작업 묶음

@@ -12,11 +12,12 @@
 - `npm run build`: 프로덕션 빌드
 - `npm run lint`: ESLint 검사
 
-테스트 명령은 아직 없다.
+- `node scripts/check-verify.mjs`: 가짜 AI 답변으로 서버 재확인 점검 (비용 없음)
+- `node scripts/run-tests.mjs accuracy gift intro rules flows`: `npm run dev`를 켠 뒤 실제 호출로 측정 (소액 비용 발생)
 
 ## 현재 상태
 
-- Next.js 16.4.3 프로젝트에 PLAN 작업 1~8번까지 만들었다. 챗봇 화면이 서버 쪽 API(`app/api/chat/route.ts`)로 실제 답변을 받지만, 상품 문서는 아직 AI에게 전달하지 않는다.
+- Next.js 16.4.3 프로젝트에 PLAN 작업 1~16번을 만들었다. 작업 17번은 OpenAI 결제 한도 설정만 사용자가 직접 해야 하고, 작업 18번 배포는 아직 하지 않았다.
 - OpenAI 모델은 `gpt-6-luna`를 쓴다.
 - Git 저장소는 `main` 브랜치로 만들어 두었다. 원격 저장소는 아직 연결하지 않았다.
 
