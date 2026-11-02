@@ -1,7 +1,7 @@
 import OpenAI, { APIConnectionTimeoutError } from "openai";
 
-// 작업 5번에서 모델을 정한다. 모델을 바꿀 때는 이 값만 고치면 된다.
-const MODEL = "gpt-4o-mini";
+// 모델을 바꿀 때는 이 값만 고치면 된다.
+const MODEL = "gpt-6-luna";
 
 // Design Ref: §7 — OpenAI가 20초 안에 답하지 않으면 오류로 처리한다.
 const AI_TIMEOUT_MS = 20000;

@@ -16,9 +16,8 @@
 
 ## 현재 상태
 
-- Next.js 16.4.3 프로젝트에 PLAN 작업 1~2번(`data/products.json`, `lib/types.ts`, `lib/products.ts`)까지 만들었다. `app/page.tsx`는 아직 기본 화면이다.
-- `openai` 패키지는 아직 설치하지 않았다. PLAN 작업 5번에서 설치한다.
-- OpenAI 모델은 `gpt-4o-mini`가 후보이고, PLAN 작업 5번 전에 사용 가능 여부와 가격을 확인해 확정한다.
+- Next.js 16.4.3 프로젝트에 PLAN 작업 1~5번까지 만들었다. 챗봇 화면은 고정 답변을 보여 주고, 서버 쪽 API(`app/api/chat/route.ts`)와는 아직 연결되지 않았다.
+- OpenAI 모델은 `gpt-6-luna`를 쓴다.
 - Git 저장소는 `main` 브랜치로 만들어 두었다. 원격 저장소는 아직 연결하지 않았다.
 
 ## 코드 구조
