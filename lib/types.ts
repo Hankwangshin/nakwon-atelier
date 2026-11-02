@@ -2,6 +2,7 @@
 export interface Product {
   id: string; // 상품 구분용 번호 (예: "p01")
   name: string; // 상품명
+  image: string; // 상품 그림 경로 (public 폴더 기준)
   price: number; // 가격(원)
   stock: number; // 재고 수량
   shipping: string; // 배송 안내
@@ -55,12 +56,15 @@ export interface AiReply {
   recommendations: { productId: string; reason: string }[];
 }
 
-// Design Ref: §5 — 서버가 화면으로 보내는 추천 카드 1개
+// Design Ref: §5 — 서버가 화면으로 보내는 상품 표의 한 줄
 export interface ProductCardData {
   name: string;
+  image: string;
   price: number;
   shipping: string;
-  reason: string;
+  features: string; // 문서의 상품 설명
+  reason: string; // 추천 이유. 상품 문의 표에서는 빈 문자열
+  isSoldOut: boolean;
 }
 
 // Design Ref: §5 — 서버가 화면으로 보내는 성공 응답

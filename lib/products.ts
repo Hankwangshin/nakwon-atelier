@@ -1,7 +1,7 @@
 import productData from "@/data/products.json";
 import type { Product } from "@/lib/types";
 
-const TEXT_FIELDS = ["id", "name", "shipping", "features"] as const;
+const TEXT_FIELDS = ["id", "name", "image", "shipping", "features"] as const;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isFilledText(value: unknown): boolean {

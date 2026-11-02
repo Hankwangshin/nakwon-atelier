@@ -2,6 +2,7 @@
   {
     "id": "p01",
     "name": "산들 젤펜 0.5mm 3색 세트",
+    "image": "/products/pen.svg",
     "price": 4500,
     "stock": 120,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -12,6 +13,7 @@
   {
     "id": "p02",
     "name": "한결 만년필 입문 세트",
+    "image": "/products/pen.svg",
     "price": 28000,
     "stock": 15,
     "shipping": "배송비 무료, 2~3일 소요",
@@ -22,6 +24,7 @@
   {
     "id": "p03",
     "name": "포근 파스텔 형광펜 6색",
+    "image": "/products/pen.svg",
     "price": 6000,
     "stock": 80,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -32,6 +35,7 @@
   {
     "id": "p04",
     "name": "또박 샤프 0.5mm",
+    "image": "/products/pen.svg",
     "price": 3500,
     "stock": 0,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -42,6 +46,7 @@
   {
     "id": "p05",
     "name": "하루 줄노트 B5 3권",
+    "image": "/products/note.svg",
     "price": 7500,
     "stock": 200,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -52,6 +57,7 @@
   {
     "id": "p06",
     "name": "오늘 가죽 다이어리 2027",
+    "image": "/products/note.svg",
     "price": 24000,
     "stock": 40,
     "shipping": "배송비 무료, 2~3일 소요",
@@ -62,6 +68,7 @@
   {
     "id": "p07",
     "name": "오밀조밀 미니 메모패드 4종",
+    "image": "/products/note.svg",
     "price": 5000,
     "stock": 150,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -72,6 +79,7 @@
   {
     "id": "p08",
     "name": "숲속 동물 스티커 팩",
+    "image": "/products/sticker.svg",
     "price": 3000,
     "stock": 300,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -82,6 +90,7 @@
   {
     "id": "p09",
     "name": "봄날 마스킹테이프 5종",
+    "image": "/products/tape.svg",
     "price": 8000,
     "stock": 90,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -92,6 +101,7 @@
   {
     "id": "p10",
     "name": "감사 손편지 세트",
+    "image": "/products/letter.svg",
     "price": 9000,
     "stock": 60,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -102,6 +112,7 @@
   {
     "id": "p11",
     "name": "둥실 원목 필통",
+    "image": "/products/pouch.svg",
     "price": 15000,
     "stock": 35,
     "shipping": "배송비 3,000원, 3~4일 소요",
@@ -112,6 +123,7 @@
   {
     "id": "p12",
     "name": "소담 패브릭 파우치 필통",
+    "image": "/products/pouch.svg",
     "price": 12000,
     "stock": 3,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -122,6 +134,7 @@
   {
     "id": "p13",
     "name": "차곡 원목 펜꽂이",
+    "image": "/products/desk.svg",
     "price": 18000,
     "stock": 25,
     "shipping": "배송비 3,000원, 3~4일 소요",
@@ -132,6 +145,7 @@
   {
     "id": "p14",
     "name": "골드 클립 책갈피 5종",
+    "image": "/products/desk.svg",
     "price": 6500,
     "stock": 70,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -142,6 +156,7 @@
   {
     "id": "p15",
     "name": "무지개 색연필 24색",
+    "image": "/products/pen.svg",
     "price": 13000,
     "stock": 55,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -152,6 +167,7 @@
   {
     "id": "p16",
     "name": "뽀득 지우개 3개입",
+    "image": "/products/desk.svg",
     "price": 2000,
     "stock": 0,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -162,6 +178,7 @@
   {
     "id": "p17",
     "name": "한지 마블 수첩 세트",
+    "image": "/products/note.svg",
     "price": 11000,
     "stock": 45,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -172,6 +189,7 @@
   {
     "id": "p18",
     "name": "달빛 무드등 데스크 시계",
+    "image": "/products/desk.svg",
     "price": 32000,
     "stock": 12,
     "shipping": "배송비 무료, 3~4일 소요",
@@ -182,6 +200,7 @@
   {
     "id": "p19",
     "name": "프리미엄 필기구 선물 세트",
+    "image": "/products/gift.svg",
     "price": 48000,
     "stock": 8,
     "shipping": "배송비 무료, 2~3일 소요",
@@ -192,6 +211,7 @@
   {
     "id": "p20",
     "name": "초등 입학 문구 꾸러미",
+    "image": "/products/gift.svg",
     "price": 22000,
     "stock": 30,
     "shipping": "배송비 무료, 2~3일 소요",
@@ -202,6 +222,7 @@
   {
     "id": "p21",
     "name": "꽃길 다꾸 스티커북",
+    "image": "/products/sticker.svg",
     "price": 6500,
     "stock": 100,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -212,6 +233,7 @@
   {
     "id": "p22",
     "name": "소소 다꾸 키트",
+    "image": "/products/sticker.svg",
     "price": 14000,
     "stock": 40,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -222,6 +244,7 @@
   {
     "id": "p23",
     "name": "레트로 씰 스티커 100매",
+    "image": "/products/sticker.svg",
     "price": 5500,
     "stock": 75,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -232,6 +255,7 @@
   {
     "id": "p24",
     "name": "토닥 곰돌이 캐릭터 볼펜",
+    "image": "/products/pen.svg",
     "price": 3500,
     "stock": 180,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -242,6 +266,7 @@
   {
     "id": "p25",
     "name": "냥냥이 캐릭터 3색 볼펜",
+    "image": "/products/pen.svg",
     "price": 4000,
     "stock": 110,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -252,6 +277,7 @@
   {
     "id": "p26",
     "name": "구름 토끼 캐릭터 볼펜 5종",
+    "image": "/products/pen.svg",
     "price": 9500,
     "stock": 50,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -262,6 +288,7 @@
   {
     "id": "p27",
     "name": "말랑 모찌 고양이",
+    "image": "/products/squishy.svg",
     "price": 5000,
     "stock": 130,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -272,6 +299,7 @@
   {
     "id": "p28",
     "name": "말랑 푸딩 곰",
+    "image": "/products/squishy.svg",
     "price": 4500,
     "stock": 0,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -282,6 +310,7 @@
   {
     "id": "p29",
     "name": "말랑 구름 스퀴시볼",
+    "image": "/products/squishy.svg",
     "price": 7000,
     "stock": 65,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -292,6 +321,7 @@
   {
     "id": "p30",
     "name": "치이카와 봉제 인형 20cm",
+    "image": "/products/plush.svg",
     "price": 18000,
     "stock": 28,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -302,6 +332,7 @@
   {
     "id": "p31",
     "name": "몬치치 인형 키링",
+    "image": "/products/plush.svg",
     "price": 9000,
     "stock": 90,
     "shipping": "배송비 3,000원, 2~3일 소요",
@@ -312,6 +343,7 @@
   {
     "id": "p32",
     "name": "폼폼푸린 대형 봉제 인형 40cm",
+    "image": "/products/plush.svg",
     "price": 35000,
     "stock": 6,
     "shipping": "배송비 무료, 3~4일 소요",

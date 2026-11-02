@@ -12,10 +12,12 @@ import type {
 
 const MAX_RECOMMENDATIONS = 3; // PRD 5번 — 추천은 최대 3개
 const MAX_CLARIFICATIONS = 2; // PRD 5번 — 추가 질문은 최대 2번
+const MIN_TABLE_PRODUCTS = 2; // 상품 문의에서 표로 보여 주는 최소 상품 수
 
 // Design Ref: §6 — 고정 문구
 export const FIXED_MESSAGES = {
   recommendation: "조건에 맞는 상품을 골랐어요.",
+  matchReason: "예산과 받는 사람 조건에 맞는 상품입니다.",
   noMatch: "조건에 맞는 상품이 없습니다.",
   cannotAnswer: "확인할 수 없습니다. 판매자에게 문의해 주세요: help@example.com",
   refusal: "죄송합니다. 상품, 배송, 선물 추천에 관한 내용만 도와드릴 수 있습니다.",
@@ -41,6 +43,19 @@ function oldestBasisDateNotice(products: Product[]): string[] {
   return [`기준일: ${oldest}`];
 }
 
+// 상품명, 가격, 배송, 설명은 AI 답변이 아닌 문서의 값을 쓴다.
+function toTableRow(product: Product, reason: string): ProductCardData {
+  return {
+    name: product.name,
+    image: product.image,
+    price: product.price,
+    shipping: product.shipping,
+    features: product.features,
+    reason,
+    isSoldOut: product.stock === 0,
+  };
+}
+
 function findProducts(ids: string[], products: Product[]): Product[] {
   return [...new Set(ids)].flatMap((id) => {
     const product = products.find((item) => item.id === id);
@@ -59,12 +74,22 @@ function verifyAnswer(reply: AiReply, products: Product[]): ChatResponse {
     notices.push(`근거 상품: ${sources.map(({ name }) => name).join(", ")}`);
   }
 
+  // 여러 상품을 안내할 때는 표로 보여 준다. 표에 품절 표시가 나오면 재고 문구도 붙인다.
+  const table =
+    sources.length >= MIN_TABLE_PRODUCTS
+      ? sources.map((product) => toTableRow(product, ""))
+      : [];
+
   // AI가 mentionsStock을 빠뜨려도 재고 확인 문구가 빠지지 않게 문장도 확인한다.
-  if (reply.mentionsStock || reply.message.includes("재고")) {
+  if (
+    reply.mentionsStock ||
+    reply.message.includes("재고") ||
+    table.some(({ isSoldOut }) => isSoldOut)
+  ) {
     notices.push(FIXED_MESSAGES.stockCheck);
   }
 
-  return respond("answer", reply.message, notices);
+  return respond("answer", reply.message, notices, table);
 }
 
 // Design Ref: §6 — 마지막 추천이나 조건 입력 안내 뒤에 나온 되묻기만 센다.
@@ -138,10 +163,10 @@ function verifyRecommendation(
   }
 
   // AI가 추천을 비우거나 조건에 맞지 않는 상품만 골라도, 문서에 맞는 상품이 있으면
-  // 서버가 채운다. 추천 이유는 문서의 특징 문장을 그대로 쓴다.
+  // 서버가 채운다.
   if (chosen.size === 0) {
     for (const product of products.filter(isEligible)) {
-      chosen.set(product.id, { product, reason: product.features });
+      chosen.set(product.id, { product, reason: FIXED_MESSAGES.matchReason });
     }
   }
 
@@ -150,13 +175,7 @@ function verifyRecommendation(
     return respond("no_match", FIXED_MESSAGES.noMatch);
   }
 
-  // 상품명, 가격, 배송은 AI 답변이 아닌 문서의 값을 쓴다.
-  const cards = final.map(({ product, reason }) => ({
-    name: product.name,
-    price: product.price,
-    shipping: product.shipping,
-    reason,
-  }));
+  const cards = final.map(({ product, reason }) => toTableRow(product, reason));
   return respond(
     "recommendation",
     FIXED_MESSAGES.recommendation,

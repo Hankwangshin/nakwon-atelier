@@ -59,7 +59,12 @@ const RULES = `당신은 문구 쇼핑몰 "문구 만물"의 고객 챗봇입니
 - 해당하지 않는 값은 null 또는 빈 목록으로 둡니다.`;
 
 export function buildSystemPrompt(products: Product[]): string {
-  return `${RULES}\n\n<상품문서>\n${JSON.stringify(products)}\n</상품문서>`;
+  // 그림 경로는 답변에 필요 없으므로 AI에게 보내지 않는다.
+  const documents = products.map((product) => ({
+    ...product,
+    image: undefined,
+  }));
+  return `${RULES}\n\n<상품문서>\n${JSON.stringify(documents)}\n</상품문서>`;
 }
 
 // Design Ref: §3 — 구조화된 출력으로 AI가 lib/types.ts의 AiReply 양식으로 답하게 한다.

@@ -57,6 +57,15 @@ const withName = verifyReply(
 );
 check("문장에 상품명이 있으면 근거 상품 안내 없음", !withName.notices.some((n) => n.startsWith("근거 상품: ")));
 
+const listed = verifyReply(reply({ sourceProductIds: ["p01", "p02"] }), products, []);
+check("상품 2개 이상을 안내하면 표를 보냄", listed.products.length === 2 && listed.products[0].image === products[0].image);
+
+const single = verifyReply(reply({ sourceProductIds: ["p01"] }), products, []);
+check("상품 1개를 안내하면 표를 보내지 않음", single.products.length === 0);
+
+const soldOutList = verifyReply(reply({ sourceProductIds: ["p01", "p04"] }), products, []);
+check("표에 품절 상품이 있으면 품절 표시와 재고 확인 문구", soldOutList.products[1].isSoldOut && soldOutList.notices.includes(FIXED_MESSAGES.stockCheck));
+
 const cannot = verifyReply(reply({ kind: "cannot_answer", message: "지어낸 말" }), products, []);
 check("cannot_answer는 고정 문구", cannot.message === FIXED_MESSAGES.cannotAnswer);
 
@@ -111,7 +120,7 @@ const filled = verifyReply(gift(["p18"], { budget: 8000 }), products, []);
 check("8-1. AI가 틀려도 문서에 맞는 상품이 있으면 서버가 채움", filled.kind === "recommendation" && filled.products.length > 0 && filled.products.every((p) => p.price <= 8000));
 
 const emptyList = verifyReply(gift([]), products, []);
-check("8-2. AI가 추천을 비워도 서버가 채움", emptyList.kind === "recommendation" && emptyList.products.length === 3);
+check("8-2. AI가 추천을 비워도 서버가 채움", emptyList.kind === "recommendation" && emptyList.products.length === 3 && emptyList.products[0].reason === FIXED_MESSAGES.matchReason);
 
 const needless = verifyReply(gift([], { kind: "question", message: "취향은요?" }), products, []);
 check("8-3. 조건을 다 받고도 되물으면 바로 추천", needless.kind === "recommendation" && needless.message === FIXED_MESSAGES.recommendation);
@@ -145,7 +154,9 @@ const other = verifyReply(gift(["p03"], { recipient: "기타" }), products, []);
 check("받는 사람이 기타면 no_match", other.kind === "no_match");
 
 const realPrice = verifyReply(gift(["p03"]), products, []);
-check("카드 가격은 문서 값", realPrice.products[0].price === products.find((p) => p.id === "p03").price);
+check("표의 가격은 문서 값", realPrice.products[0].price === products.find((p) => p.id === "p03").price);
+check("표의 설명은 문서 값", realPrice.products[0].features === products.find((p) => p.id === "p03").features);
+check("추천 이유 유지", realPrice.products[0].reason === "이유");
 check("추천에 기준일 표시", realPrice.notices.includes("기준일: 2026-11-01"));
 
 // 양식 검사
