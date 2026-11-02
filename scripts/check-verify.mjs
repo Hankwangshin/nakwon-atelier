@@ -63,6 +63,82 @@ check("cannot_answer는 고정 문구", cannot.message === FIXED_MESSAGES.cannot
 const refusal = verifyReply(reply({ kind: "refusal", message: "지어낸 말" }), products, []);
 check("refusal은 고정 문구", refusal.message === FIXED_MESSAGES.refusal);
 
+// 선물 추천 (친구에게 3만 원 조건을 기본으로 틀린 답변을 넣는다)
+const gift = (recommendations, overrides = {}) =>
+  reply({
+    kind: "recommendation",
+    message: "AI가 쓴 문장 p02 p18",
+    budget: 30000,
+    budgetType: "perPerson",
+    recipientCount: 1,
+    recipient: "친구",
+    recommendations: recommendations.map((productId) => ({ productId, reason: "이유" })),
+    ...overrides,
+  });
+const asked = { role: "assistant", content: "예산은요?", kind: "question" };
+const names = (result) => result.products.map(({ name }) => name);
+const nameOf = (id) => products.find((item) => item.id === id).name;
+
+const missingProduct = verifyReply(gift(["p03", "p99"]), products, []);
+check("1. 없는 상품은 제외", names(missingProduct).join() === nameOf("p03"));
+
+const soldOut = verifyReply(gift(["p04", "p16", "p03"], { recipient: "학생" }), products, []);
+check("2. 재고 0인 p04, p16 제외", names(soldOut).join() === nameOf("p03"));
+
+const overBudget = verifyReply(gift(["p18", "p03"]), products, []);
+check("3. 예산 초과 제외, 문장은 고정 문구", names(overBudget).join() === nameOf("p03") && overBudget.message === FIXED_MESSAGES.recommendation);
+
+const perPersonLimit = verifyReply(
+  gift(["p02", "p03"], { recipient: "친구", budgetType: "total", recipientCount: 3 }),
+  products,
+  [],
+);
+check("4. 총액 3만 원, 3명이면 1만 원 상한", names(perPersonLimit).join() === nameOf("p03"));
+
+const four = verifyReply(gift(["p03", "p07", "p08", "p09"]), products, []);
+check("5. 추천 4개면 3개만", four.products.length === 3);
+
+const duplicate = verifyReply(gift(["p03", "p03"]), products, []);
+check("6. 같은 상품은 1개만", duplicate.products.length === 1);
+
+const wrongTarget = verifyReply(gift(["p13", "p03"]), products, []);
+check("7. 추천 대상이 다른 상품 제외", names(wrongTarget).join() === nameOf("p03"));
+
+const emptied = verifyReply(gift(["p18"]), products, []);
+check("8. 모든 상품이 빠지면 no_match", emptied.kind === "no_match" && emptied.products.length === 0);
+
+const noBudget = verifyReply(gift(["p03"], { budget: null }), products, []);
+check("9-1. 예산이 없으면 question", noBudget.kind === "question" && noBudget.products.length === 0);
+
+const noBudgetLate = verifyReply(gift(["p03"], { budget: null }), products, [asked, asked]);
+check("9-2. 되묻기 2번 뒤에는 guide", noBudgetLate.kind === "guide");
+
+const noRecipient = verifyReply(gift(["p03"], { recipient: null }), products, []);
+check("9-3. 받는 사람이 없으면 question", noRecipient.kind === "question");
+
+const noBudgetType = verifyReply(gift(["p03"], { recipientCount: 3, budgetType: null }), products, []);
+check("9-4. 여러 명인데 총액·1인당 구분이 없으면 question", noBudgetType.kind === "question");
+
+const third = verifyReply(reply({ kind: "question", message: "또 물어요" }), products, [asked, asked]);
+check("10. 3번째 되묻기는 guide", third.kind === "guide" && third.message === FIXED_MESSAGES.guide);
+
+const second = verifyReply(reply({ kind: "question", message: "또 물어요" }), products, [asked]);
+check("10-1. 2번째 되묻기는 그대로 question", second.kind === "question");
+
+const restarted = verifyReply(reply({ kind: "question", message: "새로 물어요" }), products, [
+  asked,
+  asked,
+  { role: "assistant", content: "추천", kind: "recommendation" },
+]);
+check("11. 추천 뒤에는 횟수가 0부터 다시 시작", restarted.kind === "question");
+
+const other = verifyReply(gift(["p03"], { recipient: "기타" }), products, []);
+check("받는 사람이 기타면 no_match", other.kind === "no_match");
+
+const realPrice = verifyReply(gift(["p03"]), products, []);
+check("카드 가격은 문서 값", realPrice.products[0].price === products.find((p) => p.id === "p03").price);
+check("추천에 기준일 표시", realPrice.notices.includes("기준일: 2026-11-01"));
+
 // 양식 검사
 check("JSON이 아니면 null", parseAiReply("not json") === null);
 check("빈 답변이면 null", parseAiReply(null) === null);

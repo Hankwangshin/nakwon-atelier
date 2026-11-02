@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import MessageBubble from "@/components/MessageBubble";
+import ProductCard from "@/components/ProductCard";
 import {
   MAX_ASSISTANT_LENGTH,
   MAX_HISTORY_ITEMS,
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
-import type { ChatKind, HistoryItem } from "@/lib/types";
+import type { ChatKind, HistoryItem, ProductCardData } from "@/lib/types";
 
 interface ChatMessage {
   id: number;
@@ -15,6 +16,7 @@ interface ChatMessage {
   content: string;
   kind?: ChatKind;
   notices?: string[]; // 기준일, 재고 확인 문구 같은 부가 안내
+  products?: ProductCardData[]; // 추천 카드
   isLocal?: boolean; // 첫 안내처럼 서버로 보내지 않는 말풍선
 }
 
@@ -39,11 +41,22 @@ function toHistory(messages: ChatMessage[]): HistoryItem[] {
   return messages
     .filter((message) => !message.isLocal)
     .slice(-MAX_HISTORY_ITEMS)
-    .map(({ role, content, kind }) => ({
+    .map(({ role, content, kind, products }) => ({
       role,
-      content: content.slice(0, MAX_ASSISTANT_LENGTH),
+      // 추천 상품명도 함께 보내 "첫 번째 상품 배송은요?" 같은 후속 질문에 답할 수 있게 한다.
+      content: `${content}${describeProducts(products)}`.slice(
+        0,
+        MAX_ASSISTANT_LENGTH,
+      ),
       kind,
     }));
+}
+
+function describeProducts(products: ProductCardData[] = []): string {
+  if (products.length === 0) {
+    return "";
+  }
+  return ` 추천 상품: ${products.map(({ name }) => name).join(", ")}`;
 }
 
 // Design Ref: §2 — 대화는 브라우저 메모리에만 두므로 새로고침하면 사라진다.
@@ -100,6 +113,7 @@ export default function ChatPanel() {
         content: reply.message,
         kind: reply.kind,
         notices: reply.notices,
+        products: reply.products,
       });
     } catch {
       setFailedRequest({
@@ -139,6 +153,9 @@ export default function ChatPanel() {
               >
                 {notice}
               </p>
+            ))}
+            {message.products?.map((product) => (
+              <ProductCard key={product.name} {...product} />
             ))}
           </div>
         ))}
