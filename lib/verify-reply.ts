@@ -124,18 +124,24 @@ function verifyRecommendation(
     reply.budgetType === "total" && recipientCount >= 2
       ? Math.floor(budget / recipientCount)
       : budget;
+  const isEligible = (product: Product) =>
+    product.stock > 0 &&
+    product.price <= priceLimit &&
+    product.recommendedFor.includes(recipient);
 
   const chosen = new Map<string, { product: Product; reason: string }>();
   for (const { productId, reason } of reply.recommendations) {
     const product = products.find((item) => item.id === productId);
-    if (
-      product &&
-      product.stock > 0 &&
-      product.price <= priceLimit &&
-      product.recommendedFor.includes(recipient) &&
-      !chosen.has(productId)
-    ) {
+    if (product && isEligible(product) && !chosen.has(productId)) {
       chosen.set(productId, { product, reason });
+    }
+  }
+
+  // AI가 추천을 비우거나 조건에 맞지 않는 상품만 골라도, 문서에 맞는 상품이 있으면
+  // 서버가 채운다. 추천 이유는 문서의 특징 문장을 그대로 쓴다.
+  if (chosen.size === 0) {
+    for (const product of products.filter(isEligible)) {
+      chosen.set(product.id, { product, reason: product.features });
     }
   }
 
@@ -169,7 +175,10 @@ export function verifyReply(
     case "answer":
       return verifyAnswer(reply, products);
     case "question":
-      return askOrGuide(reply.message, history);
+      // 조건을 모두 받고도 더 물으면 고객이 같은 말을 반복하게 되므로 바로 추천한다.
+      return reply.recipient !== null && findMissingConditions(reply).length === 0
+        ? verifyRecommendation(reply, products, history)
+        : askOrGuide(reply.message, history);
     case "recommendation":
       return verifyRecommendation(reply, products, history);
     case "cannot_answer":

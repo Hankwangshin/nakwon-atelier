@@ -1,5 +1,5 @@
 import OpenAI, { APIConnectionTimeoutError } from "openai";
-import { AI_REPLY_SCHEMA, buildSystemPrompt } from "@/lib/chat-prompt";
+import { buildReplySchema, buildSystemPrompt } from "@/lib/chat-prompt";
 import {
   MAX_ASSISTANT_LENGTH,
   MAX_HISTORY_ITEMS,
@@ -11,7 +11,8 @@ import type { ChatKind, HistoryItem } from "@/lib/types";
 import { parseAiReply, verifyReply } from "@/lib/verify-reply";
 
 // 모델을 바꿀 때는 이 값만 고치면 된다.
-const MODEL = "gpt-6-luna";
+// gpt-4o-mini는 2027-01-14 종료 예정이며, OpenAI가 안내한 대체 모델은 gpt-6-luna다.
+const MODEL = "gpt-4o-mini";
 
 // Design Ref: §7 — OpenAI가 20초 안에 답하지 않으면 오류로 처리한다.
 const AI_TIMEOUT_MS = 20000;
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
         json_schema: {
           name: "chat_reply",
           strict: true,
-          schema: AI_REPLY_SCHEMA,
+          schema: buildReplySchema(products),
         },
       },
       messages: [

@@ -104,8 +104,17 @@ check("6. 같은 상품은 1개만", duplicate.products.length === 1);
 const wrongTarget = verifyReply(gift(["p13", "p03"]), products, []);
 check("7. 추천 대상이 다른 상품 제외", names(wrongTarget).join() === nameOf("p03"));
 
-const emptied = verifyReply(gift(["p18"]), products, []);
-check("8. 모든 상품이 빠지면 no_match", emptied.kind === "no_match" && emptied.products.length === 0);
+const emptied = verifyReply(gift(["p18"], { budget: 1000 }), products, []);
+check("8. 조건에 맞는 상품이 문서에 없으면 no_match", emptied.kind === "no_match" && emptied.products.length === 0);
+
+const filled = verifyReply(gift(["p18"], { budget: 8000 }), products, []);
+check("8-1. AI가 틀려도 문서에 맞는 상품이 있으면 서버가 채움", filled.kind === "recommendation" && filled.products.length > 0 && filled.products.every((p) => p.price <= 8000));
+
+const emptyList = verifyReply(gift([]), products, []);
+check("8-2. AI가 추천을 비워도 서버가 채움", emptyList.kind === "recommendation" && emptyList.products.length === 3);
+
+const needless = verifyReply(gift([], { kind: "question", message: "취향은요?" }), products, []);
+check("8-3. 조건을 다 받고도 되물으면 바로 추천", needless.kind === "recommendation" && needless.message === FIXED_MESSAGES.recommendation);
 
 const noBudget = verifyReply(gift(["p03"], { budget: null }), products, []);
 check("9-1. 예산이 없으면 question", noBudget.kind === "question" && noBudget.products.length === 0);
