@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import MessageBubble from "@/components/MessageBubble";
+import { MAX_QUESTION_LENGTH } from "@/lib/limits";
 
 interface ChatMessage {
   id: number;
@@ -14,9 +15,6 @@ const WELCOME_MESSAGE =
 
 // 작업 7번에서 서버 쪽 API를 연결하면 실제 답변으로 바뀐다.
 const PLACEHOLDER_REPLY = "아직 연습용 화면이에요. 곧 실제 답변을 드릴게요.";
-
-// PRD 7번 — 공개 배포 비용을 막기 위한 질문 글자 수 제한
-const MAX_QUESTION_LENGTH = 500;
 
 // Design Ref: §2 — 대화는 브라우저 메모리에만 두므로 새로고침하면 사라진다.
 export default function ChatPanel() {

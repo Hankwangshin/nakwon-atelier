@@ -1,4 +1,11 @@
 import OpenAI, { APIConnectionTimeoutError } from "openai";
+import {
+  MAX_ASSISTANT_LENGTH,
+  MAX_HISTORY_ITEMS,
+  MAX_QUESTION_LENGTH,
+} from "@/lib/limits";
+import { CHAT_KINDS } from "@/lib/types";
+import type { ChatKind } from "@/lib/types";
 
 // 모델을 바꿀 때는 이 값만 고치면 된다.
 const MODEL = "gpt-6-luna";
@@ -13,13 +20,58 @@ function errorResponse(code: string, message: string, status: number) {
   return Response.json({ error: { code, message } }, { status });
 }
 
-// Design Ref: §6 — 작업 5번은 질문 1개만 받는다. 작업 6번에서 입력 검사를 완성한다.
+function isValidHistoryItem(item: unknown): boolean {
+  if (typeof item !== "object" || item === null) {
+    return false;
+  }
+
+  const { role, content, kind } = item as Record<string, unknown>;
+  if (typeof content !== "string") {
+    return false;
+  }
+  if (role === "user") {
+    return content.length <= MAX_QUESTION_LENGTH && kind === undefined;
+  }
+  if (role === "assistant") {
+    return (
+      content.length <= MAX_ASSISTANT_LENGTH &&
+      (kind === undefined || CHAT_KINDS.includes(kind as ChatKind))
+    );
+  }
+  // Design Ref: §6 — system 등 다른 역할로 AI 규칙을 바꾸지 못하게 막는다.
+  return false;
+}
+
+function isValidHistory(history: unknown): boolean {
+  return (
+    Array.isArray(history) &&
+    history.length <= MAX_HISTORY_ITEMS &&
+    history.every(isValidHistoryItem)
+  );
+}
+
+// Design Ref: §6 — OpenAI를 호출하기 전에 거절해 비용이 들지 않게 한다.
+// 대화 기록은 작업 7번에서 AI에게 함께 보낸다.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const message: unknown = body?.message;
 
   if (typeof message !== "string" || message.trim() === "") {
     return errorResponse("INVALID_INPUT", "질문을 입력해 주세요.", 400);
+  }
+  if (message.trim().length > MAX_QUESTION_LENGTH) {
+    return errorResponse(
+      "INVALID_INPUT",
+      `질문은 ${MAX_QUESTION_LENGTH}자 이내로 입력해 주세요.`,
+      400,
+    );
+  }
+  if (!isValidHistory(body?.history ?? [])) {
+    return errorResponse(
+      "INVALID_INPUT",
+      "대화 기록 형식이 올바르지 않습니다.",
+      400,
+    );
   }
 
   try {
