@@ -8,6 +8,8 @@ import {
   MAX_HISTORY_ITEMS,
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
+import { DEFAULT_MODEL, MODELS } from "@/lib/models";
+import type { ModelId } from "@/lib/models";
 import type { ChatKind, HistoryItem, ProductCardData } from "@/lib/types";
 
 interface ChatMessage {
@@ -24,6 +26,7 @@ interface ChatMessage {
 interface FailedRequest {
   question: string;
   history: HistoryItem[];
+  model: ModelId;
   message: string;
   canRetry: boolean;
 }
@@ -67,6 +70,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [failedRequest, setFailedRequest] = useState<FailedRequest | null>(null);
+  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +90,11 @@ export default function ChatPanel() {
   }
 
   // Design Ref: §7 — 입력 오류를 뺀 나머지는 "다시 시도"로 같은 질문을 보낼 수 있다.
-  async function sendQuestion(text: string, history: HistoryItem[]) {
+  async function sendQuestion(
+    text: string,
+    history: HistoryItem[],
+    requestModel: ModelId,
+  ) {
     setFailedRequest(null);
     setIsLoading(true);
 
@@ -94,7 +102,7 @@ export default function ChatPanel() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ message: text, history, model: requestModel }),
       });
       const reply = await response.json().catch(() => null);
 
@@ -102,6 +110,7 @@ export default function ChatPanel() {
         setFailedRequest({
           question: text,
           history,
+          model: requestModel,
           message: reply?.error?.message ?? DEFAULT_FAILURE_MESSAGE,
           canRetry: reply?.error?.code !== "INVALID_INPUT",
         });
@@ -119,6 +128,7 @@ export default function ChatPanel() {
       setFailedRequest({
         question: text,
         history,
+        model: requestModel,
         message: NETWORK_FAILURE_MESSAGE,
         canRetry: true,
       });
@@ -137,7 +147,7 @@ export default function ChatPanel() {
     const history = toHistory(messages);
     addMessage({ role: "user", content: question });
     setInput("");
-    sendQuestion(question, history);
+    sendQuestion(question, history, model);
   }
 
   return (
@@ -174,7 +184,11 @@ export default function ChatPanel() {
               <button
                 type="button"
                 onClick={() =>
-                  sendQuestion(failedRequest.question, failedRequest.history)
+                  sendQuestion(
+                    failedRequest.question,
+                    failedRequest.history,
+                    failedRequest.model,
+                  )
                 }
                 className="rounded-lg border border-red-600 px-3 py-1 font-medium dark:border-red-400"
               >
@@ -190,9 +204,33 @@ export default function ChatPanel() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800"
       >
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-          개인정보를 입력하지 마세요
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+            개인정보를 입력하지 마세요
+          </p>
+          <div
+            role="group"
+            aria-label="AI 모델 선택"
+            className="flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700"
+          >
+            {MODELS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={model === id}
+                disabled={isLoading}
+                onClick={() => setModel(id)}
+                className={`rounded-md px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                  model === id
+                    ? "bg-blue-600 text-white"
+                    : "text-zinc-600 dark:text-zinc-400"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
           <input
             type="text"

@@ -5,14 +5,11 @@ import {
   MAX_HISTORY_ITEMS,
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
+import { DEFAULT_MODEL, isModelId } from "@/lib/models";
 import { products } from "@/lib/products";
 import { CHAT_KINDS } from "@/lib/types";
 import type { ChatKind, HistoryItem } from "@/lib/types";
 import { parseAiReply, verifyReply } from "@/lib/verify-reply";
-
-// 모델을 바꿀 때는 이 값만 고치면 된다.
-// gpt-4o-mini는 2027-01-14 종료 예정이며, OpenAI가 안내한 대체 모델은 gpt-6-luna다.
-const MODEL = "gpt-4o-mini";
 
 // Design Ref: §7 — OpenAI가 20초 안에 답하지 않으면 오류로 처리한다.
 const AI_TIMEOUT_MS = 20000;
@@ -64,6 +61,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const message: unknown = body?.message;
   const history: unknown = body?.history ?? [];
+  const model: unknown = body?.model ?? DEFAULT_MODEL;
 
   if (typeof message !== "string" || message.trim() === "") {
     return errorResponse("INVALID_INPUT", "질문을 입력해 주세요.", 400);
@@ -83,11 +81,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // 비용이 큰 다른 모델을 부르지 못하게, 목록에 있는 모델만 허용한다.
+  if (!isModelId(model)) {
+    return errorResponse("INVALID_INPUT", "지원하지 않는 모델입니다.", 400);
+  }
+
   try {
     // 키가 없을 때도 AI_FAILED로 답할 수 있도록 요청 안에서 만든다.
     const openai = new OpenAI({ timeout: AI_TIMEOUT_MS, maxRetries: 0 });
     const completion = await openai.chat.completions.create({
-      model: MODEL,
+      model,
       store: false,
       response_format: {
         type: "json_schema",
