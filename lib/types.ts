@@ -11,6 +11,13 @@ export interface Product {
   basisDate: string; // 기준일 (YYYY-MM-DD)
 }
 
+// Design Ref: §5 — 쇼핑몰 이용 안내 문서 1개
+export interface Guide {
+  id: string;
+  title: string;
+  content: string;
+}
+
 // Design Ref: §5 — 서버가 화면으로 보내는 최종 답변 종류
 export const CHAT_KINDS = [
   "answer",

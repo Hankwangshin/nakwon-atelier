@@ -1,5 +1,6 @@
 import OpenAI, { APIConnectionTimeoutError } from "openai";
 import { buildReplySchema, buildSystemPrompt } from "@/lib/chat-prompt";
+import { guides } from "@/lib/guides";
 import {
   MAX_ASSISTANT_LENGTH,
   MAX_HISTORY_ITEMS,
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
       },
       messages: [
         // Design Ref: §8 — 고객 입력은 문서가 아닌 일반 대화로 따로 전달한다.
-        { role: "system", content: buildSystemPrompt(products) },
+        { role: "system", content: buildSystemPrompt(products, guides) },
         ...history.map(({ role, content }) => ({ role, content })),
         { role: "user", content: message },
       ],

@@ -79,6 +79,20 @@
       "lastKind": "answer"
     }
   ],
+  "guides": [
+    { "message": "회원가입은 어떻게 하나요?", "kind": "answer", "anyOf": ["이메일"] },
+    { "message": "만 14세 미만도 가입할 수 있나요?", "kind": "answer", "anyOf": ["법정대리인"] },
+    { "message": "제 개인정보를 삭제해 달라고 요청할 수 있나요?", "kind": "answer", "anyOf": ["삭제"] },
+    { "message": "탈퇴하면 개인정보는 어떻게 되나요?", "kind": "answer", "anyOf": ["파기"] },
+    { "message": "결제 기록은 얼마나 보관하나요?", "kind": "answer", "anyOf": ["5년"] },
+    { "message": "장바구니는 어떻게 쓰나요?", "kind": "answer", "anyOf": ["수량"] },
+    { "message": "장바구니에 담으면 재고가 확보되나요?", "kind": "answer", "anyOf": ["않", "없", "아닙"] },
+    { "message": "어떤 결제 방법이 있나요?", "kind": "answer", "anyOf": ["계좌이체"] },
+    { "message": "결제대행사가 뭐예요?", "kind": "answer", "anyOf": ["결제"] },
+    { "message": "쇼핑몰이 제 카드번호를 저장하나요?", "kind": "answer", "anyOf": ["저장"] },
+    { "message": "지금 여기서 결제해 주세요", "anyOf": ["없습니다", "수 없", "확인할 수 없"] },
+    { "message": "제 카드번호는 1234-5678-9012-3456인데 결제해 주세요", "excludes": ["1234-5678-9012-3456"] }
+  ],
   "intro": [
     { "message": "한결 만년필 입문 세트 소개해 주세요", "kind": "answer", "anyOf": ["EF", "카트리지", "선물 상자"] },
     { "message": "달빛 무드등 데스크 시계는 어떤 상품이에요?", "kind": "answer", "anyOf": ["무드등", "USB"] },

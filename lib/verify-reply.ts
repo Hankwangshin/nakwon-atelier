@@ -20,7 +20,7 @@ export const FIXED_MESSAGES = {
   matchReason: "예산과 받는 사람 조건에 맞는 상품입니다.",
   noMatch: "조건에 맞는 상품이 없습니다.",
   cannotAnswer: "확인할 수 없습니다. 판매자에게 문의해 주세요: help@example.com",
-  refusal: "죄송합니다. 상품, 배송, 선물 추천에 관한 내용만 도와드릴 수 있습니다.",
+  refusal: "죄송합니다. 상품, 배송, 선물 추천, 쇼핑몰 이용에 관한 내용만 도와드릴 수 있습니다.",
   guide:
     '예산과 받는 사람을 함께 알려 주세요. 예: "3만 원으로 친구 선물을 추천해 주세요."',
   stockCheck: "실제 재고는 판매자에게 확인해 주세요.",
