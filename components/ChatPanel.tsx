@@ -2,54 +2,101 @@
 
 import { useEffect, useRef, useState } from "react";
 import MessageBubble from "@/components/MessageBubble";
-import { MAX_QUESTION_LENGTH } from "@/lib/limits";
+import {
+  MAX_ASSISTANT_LENGTH,
+  MAX_HISTORY_ITEMS,
+  MAX_QUESTION_LENGTH,
+} from "@/lib/limits";
+import type { ChatKind, HistoryItem } from "@/lib/types";
 
 interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
+  kind?: ChatKind;
+  isLocal?: boolean; // 첫 안내와 오류 문구처럼 서버로 보내지 않는 말풍선
 }
 
 const WELCOME_MESSAGE =
   "상품을 묻거나, 예산과 받는 사람을 알려 주시면 선물을 추천해요.";
 
-// 작업 7번에서 서버 쪽 API를 연결하면 실제 답변으로 바뀐다.
-const PLACEHOLDER_REPLY = "아직 연습용 화면이에요. 곧 실제 답변을 드릴게요.";
+// 작업 8번에서 오류 안내와 "다시 시도" 버튼으로 바꾼다.
+const FAILURE_MESSAGE = "답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+// Design Ref: §6 — 서버 제한을 넘지 않도록 최근 말풍선만 골라 보낸다.
+function toHistory(messages: ChatMessage[]): HistoryItem[] {
+  return messages
+    .filter((message) => !message.isLocal)
+    .slice(-MAX_HISTORY_ITEMS)
+    .map(({ role, content, kind }) => ({
+      role,
+      content: content.slice(0, MAX_ASSISTANT_LENGTH),
+      kind,
+    }));
+}
 
 // Design Ref: §2 — 대화는 브라우저 메모리에만 두므로 새로고침하면 사라진다.
 export default function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 0, role: "assistant", content: WELCOME_MESSAGE },
+    { id: 0, role: "assistant", content: WELCOME_MESSAGE, isLocal: true },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // 초과해도 입력한 내용은 자르지 않고, 보내기만 막는다.
   const question = input.trim();
   const isTooLong = question.length > MAX_QUESTION_LENGTH;
-  const canSend = question !== "" && !isTooLong;
+  const canSend = question !== "" && !isTooLong && !isLoading;
 
   // 새 말풍선이 생기면 대화 영역의 맨 아래를 보여 준다.
   useEffect(() => {
     bottomRef.current?.scrollIntoView();
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function addMessage(message: Omit<ChatMessage, "id">) {
+    const id = nextId.current++;
+    setMessages((current) => [...current, { ...message, id }]);
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canSend) {
       return;
     }
 
-    const userId = nextId.current++;
-    const replyId = nextId.current++;
-    setMessages((current) => [
-      ...current,
-      { id: userId, role: "user", content: question },
-      { id: replyId, role: "assistant", content: PLACEHOLDER_REPLY },
-    ]);
+    const history = toHistory(messages);
+    addMessage({ role: "user", content: question });
     setInput("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, history }),
+      });
+      if (!response.ok) {
+        throw new Error(`chat request failed: ${response.status}`);
+      }
+
+      const reply = await response.json();
+      addMessage({
+        role: "assistant",
+        content: reply.message,
+        kind: reply.kind,
+      });
+    } catch {
+      addMessage({
+        role: "assistant",
+        content: FAILURE_MESSAGE,
+        isLocal: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -62,6 +109,11 @@ export default function ChatPanel() {
             content={message.content}
           />
         ))}
+        {isLoading && (
+          <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
+            답변을 만드는 중
+          </p>
+        )}
         <div ref={bottomRef} />
       </div>
 

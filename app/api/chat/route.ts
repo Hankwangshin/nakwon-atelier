@@ -5,7 +5,7 @@ import {
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
 import { CHAT_KINDS } from "@/lib/types";
-import type { ChatKind } from "@/lib/types";
+import type { ChatKind, HistoryItem } from "@/lib/types";
 
 // 모델을 바꿀 때는 이 값만 고치면 된다.
 const MODEL = "gpt-6-luna";
@@ -42,7 +42,7 @@ function isValidHistoryItem(item: unknown): boolean {
   return false;
 }
 
-function isValidHistory(history: unknown): boolean {
+function isValidHistory(history: unknown): history is HistoryItem[] {
   return (
     Array.isArray(history) &&
     history.length <= MAX_HISTORY_ITEMS &&
@@ -51,10 +51,10 @@ function isValidHistory(history: unknown): boolean {
 }
 
 // Design Ref: §6 — OpenAI를 호출하기 전에 거절해 비용이 들지 않게 한다.
-// 대화 기록은 작업 7번에서 AI에게 함께 보낸다.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const message: unknown = body?.message;
+  const history: unknown = body?.history ?? [];
 
   if (typeof message !== "string" || message.trim() === "") {
     return errorResponse("INVALID_INPUT", "질문을 입력해 주세요.", 400);
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       400,
     );
   }
-  if (!isValidHistory(body?.history ?? [])) {
+  if (!isValidHistory(history)) {
     return errorResponse(
       "INVALID_INPUT",
       "대화 기록 형식이 올바르지 않습니다.",
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       store: false,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
+        ...history.map(({ role, content }) => ({ role, content })),
         { role: "user", content: message },
       ],
     });
