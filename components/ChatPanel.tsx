@@ -15,6 +15,9 @@ const WELCOME_MESSAGE =
 // 작업 7번에서 서버 쪽 API를 연결하면 실제 답변으로 바뀐다.
 const PLACEHOLDER_REPLY = "아직 연습용 화면이에요. 곧 실제 답변을 드릴게요.";
 
+// PRD 7번 — 공개 배포 비용을 막기 위한 질문 글자 수 제한
+const MAX_QUESTION_LENGTH = 500;
+
 // Design Ref: §2 — 대화는 브라우저 메모리에만 두므로 새로고침하면 사라진다.
 export default function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -24,6 +27,11 @@ export default function ChatPanel() {
   const nextId = useRef(1);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // 초과해도 입력한 내용은 자르지 않고, 보내기만 막는다.
+  const question = input.trim();
+  const isTooLong = question.length > MAX_QUESTION_LENGTH;
+  const canSend = question !== "" && !isTooLong;
+
   // 새 말풍선이 생기면 대화 영역의 맨 아래를 보여 준다.
   useEffect(() => {
     bottomRef.current?.scrollIntoView();
@@ -32,8 +40,7 @@ export default function ChatPanel() {
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const question = input.trim();
-    if (question === "") {
+    if (!canSend) {
       return;
     }
 
@@ -62,23 +69,43 @@ export default function ChatPanel() {
 
       <form
         onSubmit={handleSubmit}
-        className="flex gap-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800"
+        className="flex flex-col gap-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800"
       >
-        <input
-          type="text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="질문을 입력해 주세요"
-          aria-label="질문 입력"
-          className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700"
-        />
-        <button
-          type="submit"
-          disabled={input.trim() === ""}
-          className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          보내기
-        </button>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          개인정보를 입력하지 마세요
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="질문을 입력해 주세요"
+            aria-label="질문 입력"
+            aria-invalid={isTooLong}
+            className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700"
+          />
+          <button
+            type="submit"
+            disabled={!canSend}
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            보내기
+          </button>
+        </div>
+        <div className="flex justify-between gap-2 text-xs" aria-live="polite">
+          <span className="text-red-600 dark:text-red-400">
+            {isTooLong && `${MAX_QUESTION_LENGTH}자 이내로 줄여 주세요`}
+          </span>
+          <span
+            className={
+              isTooLong
+                ? "text-red-600 dark:text-red-400"
+                : "text-zinc-600 dark:text-zinc-400"
+            }
+          >
+            {question.length}/{MAX_QUESTION_LENGTH}
+          </span>
+        </div>
       </form>
     </>
   );
