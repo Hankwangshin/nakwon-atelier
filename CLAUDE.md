@@ -17,8 +17,8 @@
 ## 현재 상태
 
 - Next.js 16.4.3 기본 프로젝트만 설치된 상태다. `app/page.tsx`는 아직 기본 화면이다.
-- `openai` 패키지는 아직 설치하지 않았다. PRD 개발 단위 4번에서 설치한다.
-- 사용할 OpenAI 모델은 아직 정하지 않았다.
+- `openai` 패키지는 아직 설치하지 않았다. PLAN 작업 5번에서 설치한다.
+- OpenAI 모델은 [DESIGN.md](DESIGN.md)에서 `gpt-4o-mini`로 제안한 상태다.
 - Git 저장소는 `main` 브랜치로 만들어 두었다. 원격 저장소는 아직 연결하지 않았다.
 
 ## 코드 구조
@@ -26,11 +26,11 @@
 - App Router를 쓰고 `src` 폴더는 쓰지 않는다. 경로 별칭은 `@/*`다.
 - TypeScript와 Tailwind CSS를 쓴다.
 - `next.config.ts`에서 `cacheComponents`가 켜져 있다. 데이터를 다루는 코드를 쓰기 전에 관련 문서를 확인한다.
-- 제안 위치(초안): 상품 안내 문서는 `data/products.md`, 서버 쪽 API는 `app/api/chat/route.ts`에 둔다.
+- 파일 위치는 [DESIGN.md](DESIGN.md)의 파일 구조를 따른다. 상품 안내 문서는 `data/products.json`, 서버 쪽 API는 `app/api/chat/route.ts`에 둔다.
 
 ## 작업 방식
 
-- PRD 9번 "개발 단위"를 순서대로 한 번에 하나씩 진행한다.
+- [PLAN.md](PLAN.md)의 "작업 순서"를 순서대로 한 번에 하나씩 진행한다.
 - 코드를 쓰기 전에 `node_modules/next/dist/docs/`에서 관련 문서를 먼저 읽는다.
 - PRD 6번 "절대 만들지 않을 것"은 만들지 않는다. 필요해 보이면 코드를 쓰지 말고 사용자에게 PRD 수정 여부를 먼저 묻는다.
 - 기술 스택은 PRD에 정한 대로 Next.js로 고정한다. 다른 프레임워크로 바꾸거나 마이그레이션을 제안하지 않는다.
