@@ -81,7 +81,7 @@
   ],
   "guides": [
     { "message": "회원가입은 어떻게 하나요?", "kind": "answer", "anyOf": ["이메일"] },
-    { "message": "만 14세 미만도 가입할 수 있나요?", "kind": "answer", "anyOf": ["법정대리인"] },
+    { "message": "만 14세 미만도 가입할 수 있나요?", "kind": "answer", "anyOf": ["14세"] },
     { "message": "제 개인정보를 삭제해 달라고 요청할 수 있나요?", "kind": "answer", "anyOf": ["삭제"] },
     { "message": "탈퇴하면 개인정보는 어떻게 되나요?", "kind": "answer", "anyOf": ["파기"] },
     { "message": "결제 기록은 얼마나 보관하나요?", "kind": "answer", "anyOf": ["5년"] },

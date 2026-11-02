@@ -1,4 +1,5 @@
 import Image from "next/image";
+import AddToCartButton from "@/components/AddToCartButton";
 import type { ProductCardData } from "@/lib/types";
 
 interface ProductTableProps {
@@ -26,7 +27,7 @@ export default function ProductTable({ products }: ProductTableProps) {
         </thead>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
           {products.map((product) => (
-            <tr key={product.name} className="align-top">
+            <tr key={product.id} className="align-top">
               <td className="px-3 py-3">
                 <Image
                   src={product.image}
@@ -43,11 +44,10 @@ export default function ProductTable({ products }: ProductTableProps) {
                 <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                   {product.shipping}
                 </p>
-                {product.isSoldOut && (
-                  <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
-                    품절
-                  </p>
-                )}
+                <AddToCartButton
+                  productId={product.id}
+                  isSoldOut={product.isSoldOut}
+                />
               </td>
               <td className="min-w-36 px-3 py-3 leading-6">
                 <p>{product.features}</p>

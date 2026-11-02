@@ -46,6 +46,7 @@ function oldestBasisDateNotice(products: Product[]): string[] {
 // 상품명, 가격, 배송, 설명은 AI 답변이 아닌 문서의 값을 쓴다.
 function toTableRow(product: Product, reason: string): ProductCardData {
   return {
+    id: product.id,
     name: product.name,
     image: product.image,
     price: product.price,

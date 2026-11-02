@@ -65,6 +65,7 @@ export interface AiReply {
 
 // Design Ref: §5 — 서버가 화면으로 보내는 상품 표의 한 줄
 export interface ProductCardData {
+  id: string;
   name: string;
   image: string;
   price: number;
