@@ -1,3 +1,5 @@
+import { CATEGORIES } from "@/lib/categories";
+import { isUploadedImage } from "@/lib/product-images";
 import { PRODUCT_IMAGES, PRODUCT_RECIPIENTS } from "@/lib/product-options";
 import { createAdminClient } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
@@ -17,6 +19,7 @@ interface ProductRow {
   id: string;
   name: string;
   image: string;
+  category: string;
   price: number;
   stock: number;
   shipping: string;
@@ -33,7 +36,7 @@ function toProduct(row: ProductRow): Product {
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await createAdminClient()
     .from("products")
-    .select("id, name, image, price, stock, shipping, features, recommended_for, basis_date")
+    .select("id, name, image, category, price, stock, shipping, features, recommended_for, basis_date")
     .order("created_at")
     .order("id");
 
@@ -55,13 +58,16 @@ function isTextWithin(value: unknown, maxLength: number): value is string {
 export function parseProductInput(
   body: Record<string, unknown> | null,
 ): ProductInput | string {
-  const { name, image, price, stock, shipping, features, recommendedFor } = body ?? {};
+  const { name, image, category, price, stock, shipping, features, recommendedFor } = body ?? {};
 
   if (!isTextWithin(name, MAX_NAME_LENGTH)) {
     return `상품명은 ${MAX_NAME_LENGTH}자 이내로 입력해 주세요.`;
   }
-  if (!PRODUCT_IMAGES.some(({ path }) => path === image)) {
-    return "상품 그림을 선택해 주세요.";
+  if (!PRODUCT_IMAGES.some(({ path }) => path === image) && !isUploadedImage(image)) {
+    return "상품 그림을 선택하거나 사진을 올려 주세요.";
+  }
+  if (!CATEGORIES.some(({ id }) => id === category)) {
+    return "상품 분류를 선택해 주세요.";
   }
   if (!Number.isInteger(price) || (price as number) < 1 || (price as number) > MAX_PRICE) {
     return "가격은 1원 이상의 정수로 입력해 주세요.";
@@ -86,6 +92,7 @@ export function parseProductInput(
   return {
     name: name.trim(),
     image: image as string,
+    category: category as string,
     price: price as number,
     stock: stock as number,
     shipping: shipping.trim(),

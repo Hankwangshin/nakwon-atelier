@@ -14,11 +14,13 @@ export async function callApi<T>(
   method = "GET",
   body?: unknown,
 ): Promise<ApiResult<T>> {
+  const isForm = body instanceof FormData;
+
   try {
     const response = await fetch(path, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+      headers: body && !isForm ? { "Content-Type": "application/json" } : undefined,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
     });
     const data = await response.json().catch(() => null);
 

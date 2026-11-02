@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { CATEGORIES } from "@/lib/categories";
 import { callApi, formatPrice } from "@/lib/client-api";
 import { PRODUCT_IMAGES, PRODUCT_RECIPIENTS } from "@/lib/product-options";
 import type { Product } from "@/lib/types";
@@ -10,6 +11,7 @@ import type { Product } from "@/lib/types";
 interface FormState {
   name: string;
   image: string;
+  category: string;
   price: string;
   stock: string;
   shipping: string;
@@ -20,12 +22,16 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   name: "",
   image: PRODUCT_IMAGES[0].path,
+  category: CATEGORIES[0].id,
   price: "",
   stock: "",
   shipping: "배송비 3,000원, 2~3일 소요",
   features: "",
   recommendedFor: [],
 };
+
+const isIllustration = (image: string) =>
+  PRODUCT_IMAGES.some(({ path }) => path === image);
 
 const INPUT_CLASS =
   "rounded-lg border border-zinc-300 bg-transparent px-3 py-2 dark:border-zinc-700";
@@ -38,6 +44,8 @@ export default function AdminProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [newUpload, setNewUpload] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
     const result = await callApi<{ products: Product[] }>("/api/products");
@@ -56,10 +64,13 @@ export default function AdminProductsPage() {
   }, [router, loadProducts]);
 
   function startEdit(product: Product) {
+    discardUpload(newUpload);
+    setNewUpload(null);
     setEditingId(product.id);
     setForm({
       name: product.name,
       image: product.image,
+      category: product.category,
       price: String(product.price),
       stock: String(product.stock),
       shipping: product.shipping,
@@ -73,6 +84,48 @@ export default function AdminProductsPage() {
   function resetForm() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setNewUpload(null);
+  }
+
+  // 저장하지 않고 버린 사진이 저장소에 남지 않게 지운다.
+  function discardUpload(url: string | null) {
+    if (url) {
+      callApi("/api/admin/product-images", "DELETE", { url });
+    }
+  }
+
+  function handleCancel() {
+    discardUpload(newUpload);
+    resetForm();
+  }
+
+  function chooseIllustration(path: string) {
+    discardUpload(newUpload);
+    setNewUpload(null);
+    setForm((current) => ({ ...current, image: path }));
+  }
+
+  async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setIsUploading(true);
+    const body = new FormData();
+    body.append("file", file);
+    const result = await callApi<{ url: string }>("/api/admin/product-images", "POST", body);
+    setIsUploading(false);
+
+    if (!result.data) {
+      setError(result.errorMessage);
+      return;
+    }
+    discardUpload(newUpload);
+    setNewUpload(result.data.url);
+    setForm((current) => ({ ...current, image: result.data?.url ?? current.image }));
   }
 
   function toggleRecipient(recipient: string) {
@@ -144,15 +197,36 @@ export default function AdminProductsPage() {
           <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={INPUT_CLASS} />
         </label>
         <label className="flex flex-col gap-1">
-          그림
-          <select value={form.image} onChange={(event) => setForm({ ...form, image: event.target.value })} className={INPUT_CLASS}>
-            {PRODUCT_IMAGES.map(({ path, label }) => (
-              <option key={path} value={path}>
+          분류
+          <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className={INPUT_CLASS}>
+            {CATEGORIES.map(({ id, label }) => (
+              <option key={id} value={id}>
                 {label}
               </option>
             ))}
           </select>
         </label>
+        <div className="flex gap-3 sm:col-span-2">
+          <Image src={form.image} alt="상품 사진 미리보기" width={96} height={96} unoptimized className="h-24 w-24 shrink-0 rounded-lg object-cover" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <label className="flex flex-col gap-1">
+              사진 올리기 (JPG, PNG, WEBP, 5MB 이하)
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} disabled={isUploading} />
+            </label>
+            {isUploading && <p role="status">사진을 올리는 중</p>}
+            <label className="flex flex-col gap-1">
+              또는 일러스트 선택
+              <select value={isIllustration(form.image) ? form.image : ""} onChange={(event) => chooseIllustration(event.target.value)} className={INPUT_CLASS}>
+                {!isIllustration(form.image) && <option value="">올린 사진 사용 중</option>}
+                {PRODUCT_IMAGES.map(({ path, label }) => (
+                  <option key={path} value={path}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
         <label className="flex flex-col gap-1">
           가격(원)
           <input required type="number" min={1} value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} className={INPUT_CLASS} />
@@ -179,11 +253,11 @@ export default function AdminProductsPage() {
           ))}
         </fieldset>
         <div className="flex gap-2 sm:col-span-2">
-          <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white">
+          <button type="submit" disabled={isUploading} className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-50">
             {editingId ? "수정 저장" : "상품 추가"}
           </button>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-300 px-4 py-2 dark:border-zinc-700">
+          {(editingId || newUpload) && (
+            <button type="button" onClick={handleCancel} className="rounded-lg border border-zinc-300 px-4 py-2 dark:border-zinc-700">
               취소
             </button>
           )}
@@ -204,7 +278,7 @@ export default function AdminProductsPage() {
       <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-700">
         {products.map((product) => (
           <li key={product.id} className="flex flex-wrap items-center gap-3 py-2">
-            <Image src={product.image} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-lg" />
+            <Image src={product.image} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-lg object-cover" />
             <div className="min-w-40 flex-1">
               <p className="font-medium">{product.name}</p>
               <p className="text-xs text-zinc-600 dark:text-zinc-400">

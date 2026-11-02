@@ -7,9 +7,9 @@ import { callApi } from "@/lib/client-api";
 
 const LINKS = [
   { href: "/products", label: "상품" },
-  { href: "/chat", label: "챗봇" },
   { href: "/cart", label: "장바구니" },
   { href: "/orders", label: "주문 내역" },
+  { href: "/chat", label: "챗봇" },
 ];
 
 interface Me {

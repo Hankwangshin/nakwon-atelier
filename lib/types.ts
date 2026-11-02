@@ -2,7 +2,8 @@
 export interface Product {
   id: string; // 상품 구분용 번호 (예: "p01")
   name: string; // 상품명
-  image: string; // 상품 그림 경로 (public 폴더 기준)
+  image: string; // 일러스트 경로 또는 업로드한 사진 주소
+  category: string; // 진열 분류 (lib/categories.ts)
   price: number; // 가격(원)
   stock: number; // 재고 수량
   shipping: string; // 배송 안내

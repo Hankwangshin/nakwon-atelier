@@ -3,6 +3,7 @@
 // 실행: node scripts/seed-products.mjs
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { CATEGORIES } from "../lib/categories.ts";
 
 process.loadEnvFile(new URL("../.env", import.meta.url));
 const require = createRequire(import.meta.url);
@@ -18,6 +19,9 @@ const products = JSON.parse(
 const { error } = await admin.from("products").upsert(
   products.map(({ recommendedFor, basisDate, ...product }) => ({
     ...product,
+    category: CATEGORIES.find(({ images }) =>
+      images.some((name) => product.image === `/products/${name}.svg`),
+    ).id,
     recommended_for: recommendedFor,
     basis_date: basisDate,
   })),

@@ -18,7 +18,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
             width={240}
             height={240}
             unoptimized
-            className="aspect-square w-full rounded-2xl"
+            className="aspect-square w-full rounded-2xl object-cover"
           />
           <h3 className="mt-2 font-medium leading-5">{product.name}</h3>
           <p className="mt-1 font-semibold">{formatPrice(product.price)}</p>

@@ -143,7 +143,8 @@ OpenAI 호출은 Chat Completions 방식으로 하고, 구조화된 출력은 `r
 interface Product {
   id: string;              // 상품 구분용 번호 (예: "p01")
   name: string;            // 상품명
-  image: string;           // 상품 그림 경로 (예: "/products/pen.svg")
+  image: string;           // 일러스트 경로 또는 업로드한 사진 주소
+  category: string;        // 진열 분류
   price: number;           // 가격(원)
   stock: number;           // 재고 수량
   shipping: string;        // 배송 안내 (예: "배송비 3,000원, 2~3일 소요")
@@ -450,7 +451,7 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 
 ### 상품 관리
 
-`GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 비밀번호는 파일에 두지 않고 Supabase Auth만 관리한다. 그림은 일러스트 10종 중에서 고른다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
+`GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 비밀번호는 파일에 두지 않고 Supabase Auth만 관리한다. 그림은 일러스트 10종 중에서 고르거나 사진을 올린다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
 
 ### 회원 관리
 
@@ -465,6 +466,10 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 ```
 
 결제 취소 승인은 토스페이먼츠 취소 API를 호출하고, 성공하면 주문을 `cancelled`로 바꾼다. 실패하면 요청을 대기로 되돌린다. 응답이 없으면 취소 여부를 알 수 없으므로 `processing`으로 남겨 중복 취소를 막는다. 교환 승인은 상태만 기록하며 재발송은 판매자가 처리한다.
+
+### 상품 사진
+
+관리자는 상품 관리 화면에서 JPG, PNG, WEBP 사진(5MB 이하)을 올린다(`POST /api/admin/product-images`). 서버는 파일 앞부분으로 실제 형식을 검사하고 SVG는 받지 않는다. 사진은 Supabase Storage의 공개 저장소 `product-images`에 무작위 이름으로 저장한다. 사진을 바꾸거나 상품을 삭제하면 이전 사진도 지운다. 홈 분류는 `products.category`로 나눈다.
 
 ### 비밀 값
 

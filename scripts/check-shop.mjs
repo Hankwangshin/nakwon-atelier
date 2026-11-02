@@ -28,10 +28,10 @@ function createBrowser() {
     const response = await fetch(BASE + path, {
       method,
       headers: {
-        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(body && !(body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
         Cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
     });
     for (const line of response.headers.getSetCookie()) {
       const [pair] = line.split(";");
@@ -132,7 +132,7 @@ try {
   check("결제 실패 시 장바구니 유지", (await userA("/api/cart")).body.lines.length === 1);
 
   // 상품 관리
-  const sample = { name: "점검용 상품", image: "/products/pen.svg", price: 1234, stock: 5, shipping: "배송비 3,000원, 2~3일 소요", features: "점검용 설명입니다.", recommendedFor: ["친구"] };
+  const sample = { name: "점검용 상품", image: "/products/pen.svg", category: "pen", price: 1234, stock: 5, shipping: "배송비 3,000원, 2~3일 소요", features: "점검용 설명입니다.", recommendedFor: ["친구"] };
   check("비회원 상품 추가 거절", (await guest("/api/products", "POST", sample)).status === 401);
   check("일반 회원 상품 추가 거절", (await userA("/api/products", "POST", sample)).status === 403);
   check("일반 회원 상품 수정 거절", (await userA("/api/products/p01", "PATCH", sample)).status === 403);
@@ -161,13 +161,51 @@ try {
   createdProducts.push(newId);
   const listed = (await guest("/api/products")).body.products.find(({ id }) => id === newId);
   check("추가한 상품이 공개 목록에 보임", listed?.price === 1234);
+  // 상품 사진
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+  const fileForm = (bytes, type, name) => {
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type }), name);
+    return form;
+  };
+  const uploadUrl = "/api/admin/product-images";
+  // 공개 주소는 CDN 캐시가 남을 수 있어 저장소 목록으로 삭제를 확인한다.
+  const isStored = async (url) => {
+    const name = url.split("/").pop();
+    const { data } = await admin.storage.from("product-images").list("", { search: name });
+    return data.some((item) => item.name === name);
+  };
+  check("비회원 사진 업로드 거절", (await guest(uploadUrl, "POST", fileForm(png, "image/png", "a.png"))).status === 401);
+  check("일반 회원 사진 업로드 거절", (await userA(uploadUrl, "POST", fileForm(png, "image/png", "a.png"))).status === 403);
+  check("파일 없으면 거절", (await manager(uploadUrl, "POST", new FormData())).status === 400);
+  check("이름만 png인 글자 파일 거절", (await manager(uploadUrl, "POST", fileForm(Buffer.from("not image"), "image/png", "a.png"))).status === 400);
+  check("SVG 파일 거절", (await manager(uploadUrl, "POST", fileForm(Buffer.from("<svg onload='alert(1)'></svg>"), "image/svg+xml", "a.svg"))).status === 400);
+  check("5MB 초과 거절", (await manager(uploadUrl, "POST", fileForm(Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]), "image/png", "a.png"))).body?.error?.code === "IMAGE_TOO_LARGE");
+  const upload = async () => (await manager(uploadUrl, "POST", fileForm(png, "image/png", "photo.png"))).body.url;
+  const firstPhoto = await upload();
+  check("관리자 사진 업로드", Boolean(firstPhoto));
+  check("올린 사진을 누구나 볼 수 있음", (await fetch(firstPhoto)).status === 200);
+  check("외부 사진 주소 거절", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, image: "https://example.com/a.png" })).status === 400);
+  check("상품에 사진 저장", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, image: firstPhoto })).status === 200);
+  const secondPhoto = await upload();
+  check("사진 교체", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, image: secondPhoto })).status === 200);
+  check("교체한 사진이 목록에 보임", (await guest("/api/products")).body.products.find(({ id }) => id === newId).image === secondPhoto);
+  check("이전 사진은 저장소에서 삭제", !(await isStored(firstPhoto)));
+  check("새 사진은 저장소에 남음", await isStored(secondPhoto));
+  const discardPhoto = await upload();
+  check("일반 회원 사진 삭제 거절", (await userA(uploadUrl, "DELETE", { url: discardPhoto })).status === 403);
+  await manager(uploadUrl, "DELETE", { url: discardPhoto });
+  check("취소한 사진 삭제", !(await isStored(discardPhoto)));
+  check("저장소 밖 주소는 지우지 않음", (await manager(uploadUrl, "DELETE", { url: "/products/pen.svg" })).status === 200);
+
   await userB("/api/auth/login", "POST", { email: accountB.email, password: accountB.password });
   await userB("/api/cart", "POST", { productId: newId, quantity: 1 });
   check("수정 전 가격으로 장바구니 계산", (await userB("/api/cart")).body.itemsAmount === 1234);
-  check("상품 수정", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, price: 2000, features: "수정한 설명입니다." })).status === 200);
+  check("상품 수정", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, image: secondPhoto, price: 2000, features: "수정한 설명입니다." })).status === 200);
   check("수정한 가격이 장바구니에 바로 반영", (await userB("/api/cart")).body.itemsAmount === 2000);
   check("없는 상품 수정은 404", (await manager("/api/products/nope", "PATCH", sample)).status === 404);
   check("상품 삭제", (await manager(`/api/products/${newId}`, "DELETE")).status === 200);
+  check("삭제한 상품의 사진도 저장소에서 삭제", !(await isStored(secondPhoto)));
   check("삭제한 상품은 공개 목록에서 사라짐", !(await guest("/api/products")).body.products.some(({ id }) => id === newId));
   check("삭제한 상품은 장바구니에서도 사라짐", (await userB("/api/cart")).body.lines.length === 0);
 

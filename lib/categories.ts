@@ -1,6 +1,6 @@
 import type { Product } from "./types";
 
-// 상품 그림 종류로 진열 분류를 나눈다.
+// 홈과 상품 관리에서 쓰는 진열 분류. images는 처음 샘플 상품을 나눌 때만 쓴다.
 export const CATEGORIES = [
   { id: "plush", label: "캐릭터 인형", images: ["plush"] },
   { id: "squishy", label: "말랑이", images: ["squishy"] },
@@ -13,9 +13,7 @@ export const CATEGORIES = [
 
 export function productsInCategory(
   products: Product[],
-  images: readonly string[],
+  categoryId: string,
 ): Product[] {
-  return products.filter(({ image }) =>
-    images.some((name) => image === `/products/${name}.svg`),
-  );
+  return products.filter(({ category }) => category === categoryId);
 }

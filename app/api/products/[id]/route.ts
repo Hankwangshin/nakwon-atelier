@@ -1,5 +1,6 @@
 import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
+import { removeUploadedImage } from "@/lib/product-images";
 import { parseProductInput, toProductRow } from "@/lib/products";
 import { createAdminClient } from "@/lib/supabase";
 
@@ -15,7 +16,13 @@ export async function PATCH(request: Request, context: RouteContext<"/api/produc
   }
 
   const { id } = await context.params;
-  const { data, error } = await createAdminClient()
+  const admin = createAdminClient();
+  const { data: before } = await admin
+    .from("products")
+    .select("image")
+    .eq("id", id)
+    .maybeSingle();
+  const { data, error } = await admin
     .from("products")
     .update(toProductRow(input))
     .eq("id", id)
@@ -27,6 +34,11 @@ export async function PATCH(request: Request, context: RouteContext<"/api/produc
   }
   if (data.length === 0) {
     return errorResponse("NOT_FOUND", "없는 상품입니다.", 404);
+  }
+
+  // 사진을 바꾸면 이전 사진은 저장소에서 지운다.
+  if (before?.image !== input.image) {
+    await removeUploadedImage(before?.image);
   }
   return Response.json({ ok: true });
 }
@@ -44,7 +56,7 @@ export async function DELETE(_request: Request, context: RouteContext<"/api/prod
     .from("products")
     .delete()
     .eq("id", id)
-    .select("id");
+    .select("id, image");
 
   if (error) {
     logFailure("product delete failed", error);
@@ -55,5 +67,6 @@ export async function DELETE(_request: Request, context: RouteContext<"/api/prod
   }
 
   await admin.from("cart_items").delete().eq("product_id", id);
+  await removeUploadedImage(data[0].image);
   return Response.json({ ok: true });
 }

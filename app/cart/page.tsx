@@ -63,7 +63,7 @@ export default function CartPage() {
                   width={56}
                   height={56}
                   unoptimized
-                  className="h-14 w-14 rounded-lg"
+                  className="h-14 w-14 rounded-lg object-cover"
                 />
                 <div className="min-w-40 flex-1">
                   <p className="font-semibold">{line.name}</p>

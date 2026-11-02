@@ -35,7 +35,7 @@ export default function ProductTable({ products }: ProductTableProps) {
                   width={64}
                   height={64}
                   unoptimized
-                  className="h-14 w-14 max-w-none rounded-lg sm:h-16 sm:w-16"
+                  className="h-14 w-14 max-w-none rounded-lg object-cover sm:h-16 sm:w-16"
                 />
               </td>
               <td className="min-w-28 px-3 py-3">

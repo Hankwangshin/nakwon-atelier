@@ -11,7 +11,7 @@ export default function Home() {
   const { products, error } = useProducts();
   const sections = CATEGORIES.map((category) => ({
     ...category,
-    products: productsInCategory(products ?? [], category.images),
+    products: productsInCategory(products ?? [], category.id),
   })).filter((section) => section.products.length > 0);
 
   return (
