@@ -13,24 +13,27 @@ const LINKS = [
 ];
 
 interface Me {
-  user: { name?: string } | null;
+  user: { name?: string; isAdmin?: boolean } | null;
 }
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // 페이지를 옮길 때마다 로그인 상태를 다시 확인한다.
   useEffect(() => {
     callApi<Me>("/api/auth/me").then(({ data }) => {
       setIsLoggedIn(Boolean(data?.user));
+      setIsAdmin(data?.user?.isAdmin === true);
     });
   }, [pathname]);
 
   async function handleLogout() {
     await callApi("/api/auth/logout", "POST");
     setIsLoggedIn(false);
+    setIsAdmin(false);
     router.push("/");
   }
 
@@ -60,6 +63,11 @@ export default function SiteHeader() {
         <span className="ml-auto flex gap-3">
           {isLoggedIn ? (
             <>
+              {isAdmin && (
+                <Link href="/admin/products" className="text-zinc-600 dark:text-zinc-400">
+                  상품 관리
+                </Link>
+              )}
               <Link href="/account" className="text-zinc-600 dark:text-zinc-400">
                 내 정보
               </Link>

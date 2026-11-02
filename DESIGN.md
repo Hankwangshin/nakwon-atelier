@@ -136,7 +136,7 @@ OpenAI 호출은 Chat Completions 방식으로 하고, 구조화된 출력은 `r
 
 ## 5. 데이터 구조
 
-상품 안내 문서는 `data/products.json`에 둔다. 서버가 가격과 재고를 코드로 확인해야 하므로, 칸이 정해진 형식이 필요해 JSON을 쓴다. 공개 등급 문서이므로 공개 가능한 샘플 상품 정보만 넣고, 내부 자료와 개인정보는 넣지 않는다.
+상품은 Supabase `products` 표에 두고 `lib/products.ts`의 `getProducts()`로 읽는다. `data/products.json`은 처음 넣은 샘플 데이터이자 테스트 기준값이다. 공개 등급 문서이므로 공개 가능한 샘플 상품 정보만 넣고, 내부 자료와 개인정보는 넣지 않는다.
 
 ```typescript
 // 상품 1개
@@ -318,7 +318,7 @@ interface HistoryItem {
 
 "다시 시도"는 마지막 질문을 같은 내용으로 다시 보낸다.
 
-상품 문서에 문제가 있으면 `lib/products.ts`의 검사가 오류를 내서 빌드와 앱 시작을 멈춘다. 잘못된 문서가 배포되지 않게 하기 위해서다.
+상품은 저장할 때 `parseProductInput()`과 데이터베이스 제약으로 검사한다. 이용 안내 문서에 문제가 있으면 `lib/guides.ts`의 검사가 빌드와 앱 시작을 멈춘다.
 
 ## 8. 보안
 
@@ -432,6 +432,7 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 | `/checkout/success`, `/checkout/fail` | 결제 결과 |
 | `/orders` | 결제한 주문 내역 |
 | `/account` | 내 정보, 회원 탈퇴 |
+| `/admin/products` | 관리자 전용 상품 추가, 수정, 삭제 |
 
 ### 결제 흐름
 
@@ -444,6 +445,10 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 ### 데이터와 권한
 
 표는 `supabase/migrations`에 있다. 회원은 RLS로 자기 데이터만 볼 수 있고, 주문과 회원 정보 저장은 서버의 service role 키로만 한다. 탈퇴하면 회원 정보와 장바구니는 삭제되고, 주문은 회원 연결만 끊어 보관한다.
+
+### 상품 관리
+
+`GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 계정 정보는 `.env`의 `ADMIN_LOGIN_EMAIL`, `ADMIN_INITIAL_PASSWORD`에 있다. 그림은 일러스트 10종 중에서 고른다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
 
 ### 비밀 값
 

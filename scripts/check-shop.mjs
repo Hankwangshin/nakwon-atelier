@@ -64,6 +64,7 @@ const guest = createBrowser();
 const accountA = newAccount();
 const accountB = newAccount();
 const createdIds = [];
+const createdProducts = [];
 
 try {
   // 회원가입
@@ -130,6 +131,42 @@ try {
   check("실패한 주문은 주문 내역에 없음", (await userA("/api/orders")).body.orders.length === 0);
   check("결제 실패 시 장바구니 유지", (await userA("/api/cart")).body.lines.length === 1);
 
+  // 상품 관리
+  const sample = { name: "점검용 상품", image: "/products/pen.svg", price: 1234, stock: 5, shipping: "배송비 3,000원, 2~3일 소요", features: "점검용 설명입니다.", recommendedFor: ["친구"] };
+  check("비회원 상품 추가 거절", (await guest("/api/products", "POST", sample)).status === 401);
+  check("일반 회원 상품 추가 거절", (await userA("/api/products", "POST", sample)).status === 403);
+  check("일반 회원 상품 수정 거절", (await userA("/api/products/p01", "PATCH", sample)).status === 403);
+  check("일반 회원 상품 삭제 거절", (await userA("/api/products/p01", "DELETE")).status === 403);
+  const { error: anonProduct } = await anon.from("products").insert({ id: "hack", name: "x", image: "x", price: 1, stock: 1, shipping: "x", features: "x", recommended_for: ["친구"] });
+  check("공개 키로 상품을 추가할 수 없음", Boolean(anonProduct));
+  const { error: selfAdmin } = await signedIn.from("profiles").update({ is_admin: true }).eq("id", meB.id).select();
+  const { data: stillUser } = await admin.from("profiles").select("is_admin").eq("id", meB.id).single();
+  check("회원이 스스로 관리자가 될 수 없음", stillUser.is_admin === false || Boolean(selfAdmin));
+
+  const manager = createBrowser();
+  check("관리자 로그인", (await manager("/api/auth/login", "POST", { email: process.env.ADMIN_LOGIN_EMAIL, password: process.env.ADMIN_INITIAL_PASSWORD })).status === 200);
+  check("관리자 표시", (await manager("/api/auth/me")).body?.user?.isAdmin === true);
+  check("가격 0 거절", (await manager("/api/products", "POST", { ...sample, price: 0 })).status === 400);
+  check("없는 그림 거절", (await manager("/api/products", "POST", { ...sample, image: "https://example.com/x.png" })).status === 400);
+  check("없는 추천 대상 거절", (await manager("/api/products", "POST", { ...sample, recommendedFor: ["기타"] })).status === 400);
+  check("배송 안내 형식 거절", (await manager("/api/products", "POST", { ...sample, shipping: "빠른 배송" })).status === 400);
+  const addedProduct = await manager("/api/products", "POST", sample);
+  check("상품 추가", addedProduct.status === 201);
+  const newId = addedProduct.body.id;
+  createdProducts.push(newId);
+  const listed = (await guest("/api/products")).body.products.find(({ id }) => id === newId);
+  check("추가한 상품이 공개 목록에 보임", listed?.price === 1234);
+  await userB("/api/auth/login", "POST", { email: accountB.email, password: accountB.password });
+  await userB("/api/cart", "POST", { productId: newId, quantity: 1 });
+  check("수정 전 가격으로 장바구니 계산", (await userB("/api/cart")).body.itemsAmount === 1234);
+  check("상품 수정", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, price: 2000, features: "수정한 설명입니다." })).status === 200);
+  check("수정한 가격이 장바구니에 바로 반영", (await userB("/api/cart")).body.itemsAmount === 2000);
+  check("없는 상품 수정은 404", (await manager("/api/products/nope", "PATCH", sample)).status === 404);
+  check("상품 삭제", (await manager(`/api/products/${newId}`, "DELETE")).status === 200);
+  check("삭제한 상품은 공개 목록에서 사라짐", !(await guest("/api/products")).body.products.some(({ id }) => id === newId));
+  check("삭제한 상품은 장바구니에서도 사라짐", (await userB("/api/cart")).body.lines.length === 0);
+  await userB("/api/auth/logout", "POST");
+
   // 탈퇴
   check("로그아웃 후 정보 없음", await (async () => {
     await userB("/api/auth/logout", "POST");
@@ -144,6 +181,9 @@ try {
   check("탈퇴해도 주문은 보관, 회원 연결만 끊김", kept.user_id === null);
 } finally {
   // 시험 데이터 정리
+  for (const id of createdProducts) {
+    await admin.from("products").delete().eq("id", id);
+  }
   await admin.from("orders").delete().like("receiver_name", "시험 회원");
   for (const id of createdIds) {
     await admin.auth.admin.deleteUser(id).catch(() => null);

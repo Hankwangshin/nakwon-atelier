@@ -1,14 +1,17 @@
+"use client";
+
 import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
+import { useProducts } from "@/components/useProducts";
 import { CATEGORIES, productsInCategory } from "@/lib/categories";
-import { products } from "@/lib/products";
 
 const FEATURED_COUNT = 4;
 
 export default function Home() {
+  const { products, error } = useProducts();
   const sections = CATEGORIES.map((category) => ({
     ...category,
-    products: productsInCategory(products, category.images),
+    products: productsInCategory(products ?? [], category.images),
   })).filter((section) => section.products.length > 0);
 
   return (
@@ -36,6 +39,13 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {!products && <p className="mt-6 text-sm">상품을 불러오는 중</p>}
+      {error && (
+        <p role="alert" className="mt-6 text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
 
       <nav
         aria-label="상품 분류"

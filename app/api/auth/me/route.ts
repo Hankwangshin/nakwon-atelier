@@ -10,12 +10,18 @@ export async function GET() {
   const supabase = await createUserClient();
   const { data } = await supabase
     .from("profiles")
-    .select("name, phone")
+    .select("name, phone, is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
   return Response.json({
-    user: { id: user.id, email: user.email, name: data?.name, phone: data?.phone },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: data?.name,
+      phone: data?.phone,
+      isAdmin: data?.is_admin === true,
+    },
   });
 }
 

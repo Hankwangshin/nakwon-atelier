@@ -7,7 +7,7 @@ import {
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
 import { DEFAULT_MODEL, isModelId } from "@/lib/models";
-import { products } from "@/lib/products";
+import { getProducts } from "@/lib/products";
 import { CHAT_KINDS } from "@/lib/types";
 import type { ChatKind, HistoryItem } from "@/lib/types";
 import { parseAiReply, verifyReply } from "@/lib/verify-reply";
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const products = await getProducts();
     // 키가 없을 때도 AI_FAILED로 답할 수 있도록 요청 안에서 만든다.
     const openai = new OpenAI({ timeout: AI_TIMEOUT_MS, maxRetries: 0 });
     const completion = await openai.chat.completions.create({

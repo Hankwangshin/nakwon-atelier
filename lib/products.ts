@@ -1,76 +1,120 @@
-import productData from "@/data/products.json";
+import { PRODUCT_IMAGES, PRODUCT_RECIPIENTS } from "@/lib/product-options";
+import { createAdminClient, getCurrentUser } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
 
-const TEXT_FIELDS = ["id", "name", "image", "shipping", "features"] as const;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+// 이 파일은 서버 전용 키를 쓰므로 서버 쪽 코드에서만 가져온다.
 
-function isFilledText(value: unknown): boolean {
-  return typeof value === "string" && value.trim() !== "";
+const MAX_PRICE = 10000000;
+const MAX_STOCK = 99999;
+const MAX_NAME_LENGTH = 100;
+const MAX_SHIPPING_LENGTH = 100;
+const MAX_FEATURES_LENGTH = 500;
+const SHIPPING_PATTERN = /무료|배송비\s*[\d,]+원/;
+
+export type ProductInput = Omit<Product, "id" | "basisDate">;
+
+interface ProductRow {
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  stock: number;
+  shipping: string;
+  features: string;
+  recommended_for: string[];
+  basis_date: string;
 }
 
-// 상품 1개의 문제를 찾아 문구 목록으로 돌려준다.
-function findProductProblems(item: unknown, label: string): string[] {
-  if (typeof item !== "object" || item === null) {
-    return [`${label}: 상품 형식이 아닙니다.`];
-  }
+function toProduct(row: ProductRow): Product {
+  const { recommended_for, basis_date, ...rest } = row;
+  return { ...rest, recommendedFor: recommended_for, basisDate: basis_date };
+}
 
-  const product = item as Record<string, unknown>;
-  const problems: string[] = [];
+export async function getProducts(): Promise<Product[]> {
+  const { data, error } = await createAdminClient()
+    .from("products")
+    .select("id, name, image, price, stock, shipping, features, recommended_for, basis_date")
+    .order("created_at")
+    .order("id");
 
-  for (const field of TEXT_FIELDS) {
-    if (!isFilledText(product[field])) {
-      problems.push(`${label}: ${field} 항목이 비어 있습니다.`);
-    }
+  if (error) {
+    throw new Error(`products read failed: ${error.code}`);
   }
-  if (!Number.isInteger(product.price) || (product.price as number) <= 0) {
-    problems.push(`${label}: price는 1 이상의 정수여야 합니다.`);
+  return data.map(toProduct);
+}
+
+function isTextWithin(value: unknown, maxLength: number): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim() !== "" &&
+    value.length <= maxLength
+  );
+}
+
+// 관리자 입력을 검사한다. 문제가 있으면 문구를, 없으면 저장할 값을 돌려준다.
+export function parseProductInput(
+  body: Record<string, unknown> | null,
+): ProductInput | string {
+  const { name, image, price, stock, shipping, features, recommendedFor } = body ?? {};
+
+  if (!isTextWithin(name, MAX_NAME_LENGTH)) {
+    return `상품명은 ${MAX_NAME_LENGTH}자 이내로 입력해 주세요.`;
   }
-  if (!Number.isInteger(product.stock) || (product.stock as number) < 0) {
-    problems.push(`${label}: stock은 0 이상의 정수여야 합니다.`);
+  if (!PRODUCT_IMAGES.some(({ path }) => path === image)) {
+    return "상품 그림을 선택해 주세요.";
+  }
+  if (!Number.isInteger(price) || (price as number) < 1 || (price as number) > MAX_PRICE) {
+    return "가격은 1원 이상의 정수로 입력해 주세요.";
+  }
+  if (!Number.isInteger(stock) || (stock as number) < 0 || (stock as number) > MAX_STOCK) {
+    return "재고는 0 이상의 정수로 입력해 주세요.";
+  }
+  if (!isTextWithin(shipping, MAX_SHIPPING_LENGTH) || !SHIPPING_PATTERN.test(shipping)) {
+    return '배송 안내에는 "배송비 3,000원" 또는 "무료"를 넣어 주세요.';
+  }
+  if (!isTextWithin(features, MAX_FEATURES_LENGTH)) {
+    return `상품 설명은 ${MAX_FEATURES_LENGTH}자 이내로 입력해 주세요.`;
   }
   if (
-    !Array.isArray(product.recommendedFor) ||
-    product.recommendedFor.length === 0 ||
-    !product.recommendedFor.every(isFilledText)
+    !Array.isArray(recommendedFor) ||
+    recommendedFor.length === 0 ||
+    !recommendedFor.every((item) => PRODUCT_RECIPIENTS.includes(item))
   ) {
-    problems.push(`${label}: recommendedFor에 추천 대상이 1개 이상 있어야 합니다.`);
-  }
-  if (
-    typeof product.basisDate !== "string" ||
-    !DATE_PATTERN.test(product.basisDate)
-  ) {
-    problems.push(`${label}: basisDate는 YYYY-MM-DD 형식이어야 합니다.`);
+    return "추천 대상을 1개 이상 선택해 주세요.";
   }
 
-  return problems;
+  return {
+    name: name.trim(),
+    image: image as string,
+    price: price as number,
+    stock: stock as number,
+    shipping: shipping.trim(),
+    features: features.trim(),
+    recommendedFor,
+  };
 }
 
-// Design Ref: §5 — 서버가 가격과 재고를 믿고 쓸 수 있도록 문서를 먼저 검사한다.
-// 문제가 있으면 한 번에 고칠 수 있게 모두 모아서 알려 준다.
-export function validateProducts(data: unknown): Product[] {
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error("상품 문서 오류: 상품 목록이 비어 있거나 목록 형식이 아닙니다.");
-  }
-
-  const problems: string[] = [];
-  const seenIds = new Set<unknown>();
-
-  data.forEach((item, index) => {
-    const label = `${index + 1}번째 상품`;
-    problems.push(...findProductProblems(item, label));
-
-    const id = (item as { id?: unknown } | null)?.id;
-    if (id !== undefined && seenIds.has(id)) {
-      problems.push(`${label}: id ${String(id)}가 중복되었습니다.`);
-    }
-    seenIds.add(id);
-  });
-
-  if (problems.length > 0) {
-    throw new Error(`상품 문서 오류:\n${problems.join("\n")}`);
-  }
-
-  return data as Product[];
+export function toProductRow(input: ProductInput) {
+  const { recommendedFor, ...rest } = input;
+  return {
+    ...rest,
+    recommended_for: recommendedFor,
+    basis_date: new Date().toISOString().slice(0, 10),
+  };
 }
 
-export const products = validateProducts(productData);
+// 관리자 여부는 회원이 바꿀 수 없는 서버 쪽 값으로만 판단한다.
+export async function getAdminUser() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { user: null, isAdmin: false };
+  }
+
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return { user, isAdmin: data?.is_admin === true };
+}

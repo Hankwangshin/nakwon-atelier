@@ -6,7 +6,7 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
-import { products } from "@/lib/products";
+import { getProducts } from "@/lib/products";
 import { createAdminClient, createUserClient, getCurrentUser } from "@/lib/supabase";
 
 const PHONE_PATTERN = /^01\d-?\d{3,4}-?\d{4}$/;
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     return serverFailedResponse();
   }
 
-  const cart = summarizeCart(rows, products);
+  const cart = summarizeCart(rows, await getProducts());
   if (!isOrderable(cart.lines)) {
     return errorResponse(
       "NOT_ORDERABLE",

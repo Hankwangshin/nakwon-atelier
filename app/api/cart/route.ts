@@ -5,7 +5,8 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
-import { products } from "@/lib/products";
+import { getProducts } from "@/lib/products";
+import type { Product } from "@/lib/types";
 import { createUserClient, getCurrentUser } from "@/lib/supabase";
 
 async function readCart(userId: string) {
@@ -20,10 +21,14 @@ async function readCart(userId: string) {
     logFailure("cart read failed", error);
     return serverFailedResponse();
   }
-  return Response.json(summarizeCart(data, products));
+  return Response.json(summarizeCart(data, await getProducts()));
 }
 
-function findQuantityProblem(productId: unknown, quantity: unknown) {
+function findQuantityProblem(
+  products: Product[],
+  productId: unknown,
+  quantity: unknown,
+) {
   const product = products.find(({ id }) => id === productId);
 
   if (!product) {
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const quantity = (existing?.quantity ?? 0) + added;
-  const problem = findQuantityProblem(productId, quantity);
+  const problem = findQuantityProblem(await getProducts(), productId, quantity);
   if (problem) {
     return problem;
   }
@@ -90,7 +95,11 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const problem = findQuantityProblem(body?.productId, body?.quantity);
+  const problem = findQuantityProblem(
+    await getProducts(),
+    body?.productId,
+    body?.quantity,
+  );
   if (problem) {
     return problem;
   }
