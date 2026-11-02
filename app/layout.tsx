@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "문구 만물",
-  description: "상품 문의와 문구 선물 추천 챗봇",
+  title: "낙원 아뜰리에",
+  description: "문구와 소품을 모은 낙원 아뜰리에",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
