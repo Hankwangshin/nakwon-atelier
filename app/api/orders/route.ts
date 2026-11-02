@@ -21,10 +21,10 @@ export async function GET() {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "order_number, order_name, amount, status, created_at, paid_at, order_items (name, price, quantity)",
+      "order_number, order_name, amount, status, created_at, paid_at, order_items (name, price, quantity), order_requests (type, reason, status, created_at)",
     )
     .eq("user_id", user.id)
-    .eq("status", "paid")
+    .in("status", ["paid", "cancelled"])
     .order("created_at", { ascending: false });
 
   if (error) {

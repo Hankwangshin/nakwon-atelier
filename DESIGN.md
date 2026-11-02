@@ -434,6 +434,7 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 | `/account` | 내 정보, 회원 탈퇴 |
 | `/admin/products` | 관리자 전용 상품 추가, 수정, 삭제 |
 | `/admin/members` | 관리자 전용 회원 목록, 회원 탈퇴 처리 |
+| `/admin/requests` | 관리자 전용 상품 교환·결제 취소 승인, 거절 |
 
 ### 결제 흐름
 
@@ -454,6 +455,16 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 ### 회원 관리
 
 `GET /api/admin/members`와 `DELETE /api/admin/members/[id]`는 관리자만 쓸 수 있다. 목록에는 이름, 이메일, 가입일, 관리자 여부만 보내고 연락처는 보내지 않는다. 탈퇴 처리는 회원 본인의 탈퇴와 같이 회원 정보와 장바구니를 삭제하고 주문은 회원 연결만 끊어 보관한다. 관리자 계정은 본인 탈퇴와 탈퇴 처리가 모두 막혀 있다.
+
+### 상품 교환과 결제 취소
+
+구매자는 `/orders`에서 결제 완료 주문에 사유와 함께 요청한다(`POST /api/orders/[orderNumber]/requests`). 한 주문에는 처리 중인 요청을 하나만 둔다. 관리자는 `/admin/requests`에서 승인하거나 거절한다(`PATCH /api/admin/requests/[id]`).
+
+```
+요청(pending) → 처리 시작(processing) → 승인(approved) 또는 거절(rejected)
+```
+
+결제 취소 승인은 토스페이먼츠 취소 API를 호출하고, 성공하면 주문을 `cancelled`로 바꾼다. 실패하면 요청을 대기로 되돌린다. 응답이 없으면 취소 여부를 알 수 없으므로 `processing`으로 남겨 중복 취소를 막는다. 교환 승인은 상태만 기록하며 재발송은 판매자가 처리한다.
 
 ### 비밀 값
 

@@ -71,6 +71,9 @@ export default function SiteHeader() {
                   <Link href="/admin/members" className="text-zinc-600 dark:text-zinc-400">
                     회원 관리
                   </Link>
+                  <Link href="/admin/requests" className="text-zinc-600 dark:text-zinc-400">
+                    요청 관리
+                  </Link>
                 </>
               )}
               <Link href="/account" className="text-zinc-600 dark:text-zinc-400">

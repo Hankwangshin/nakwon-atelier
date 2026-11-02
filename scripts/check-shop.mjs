@@ -166,6 +166,48 @@ try {
   check("삭제한 상품은 공개 목록에서 사라짐", !(await guest("/api/products")).body.products.some(({ id }) => id === newId));
   check("삭제한 상품은 장바구니에서도 사라짐", (await userB("/api/cart")).body.lines.length === 0);
 
+  // 상품 교환, 결제 취소
+  const makePaidOrder = async (userId, key) => {
+    const number = `order_check_${randomBytes(6).toString("hex")}`;
+    await admin.from("orders").insert({ order_number: number, user_id: userId, order_name: "점검 주문", items_amount: 1000, shipping_fee: 0, amount: 1000, status: "paid", payment_key: key, receiver_name: "시험 회원", receiver_phone: "010-0000-0000", address: "샘플 주소", paid_at: new Date().toISOString() });
+    return number;
+  };
+  const paid = await makePaidOrder(meB.id, "fake-payment-key");
+  const requestUrl = `/api/orders/${paid}/requests`;
+  const readRequests = async () => (await manager("/api/admin/requests")).body.requests.filter(({ orders }) => orders.order_number === paid);
+  const decide = (browser, id, decision) => browser(`/api/admin/requests/${id}`, "PATCH", { decision });
+
+  check("비회원 교환 신청 거절", (await guest(requestUrl, "POST", { type: "exchange", reason: "사유" })).status === 401);
+  check("다른 회원 주문에 요청 불가", (await manager(requestUrl, "POST", { type: "exchange", reason: "사유" })).status === 404);
+  check("사유 없으면 거절", (await userB(requestUrl, "POST", { type: "exchange", reason: "  " })).status === 400);
+  check("없는 요청 종류 거절", (await userB(requestUrl, "POST", { type: "refund", reason: "사유" })).status === 400);
+  check("상품 교환 신청", (await userB(requestUrl, "POST", { type: "exchange", reason: "색상을 바꾸고 싶어요" })).status === 201);
+  check("처리 중이면 중복 요청 거절", (await userB(requestUrl, "POST", { type: "cancel", reason: "사유" })).status === 409);
+  const listedOrder = (await userB("/api/orders")).body.orders.find(({ order_number }) => order_number === paid);
+  check("주문 내역에 요청 상태 표시", listedOrder?.order_requests?.[0]?.status === "pending");
+  check("일반 회원 요청 목록 거절", (await userB("/api/admin/requests")).status === 403);
+  const [exchange] = await readRequests();
+  check("일반 회원 승인 거절", (await decide(userB, exchange.id, "approve")).status === 403);
+  check("비회원 승인 거절", (await decide(guest, exchange.id, "approve")).status === 401);
+  check("잘못된 처리 방법 거절", (await decide(manager, exchange.id, "maybe")).status === 400);
+  check("관리자 교환 승인", (await decide(manager, exchange.id, "approve")).status === 200);
+  check("처리된 요청은 다시 승인 불가", (await decide(manager, exchange.id, "approve")).status === 409);
+
+  check("결제 취소 요청", (await userB(requestUrl, "POST", { type: "cancel", reason: "마음이 바뀌었어요" })).status === 201);
+  const cancelRequest = (await readRequests()).find(({ type }) => type === "cancel");
+  check("관리자 거절", (await decide(manager, cancelRequest.id, "reject")).status === 200);
+  check("거절 후 다시 요청 가능", (await userB(requestUrl, "POST", { type: "cancel", reason: "다시 요청합니다" })).status === 201);
+  const reopened = (await readRequests()).find(({ status }) => status === "pending");
+  const failedCancel = await decide(manager, reopened.id, "approve");
+  check("결제대행사가 거절하면 취소 실패", failedCancel.body?.error?.code === "CANCEL_FAILED");
+  const { data: stillPaid } = await admin.from("orders").select("status").eq("order_number", paid).single();
+  check("취소 실패 시 주문은 결제 완료 유지", stillPaid.status === "paid");
+  check("취소 실패 시 요청은 대기로 복구", (await readRequests()).some(({ id, status }) => id === reopened.id && status === "pending"));
+  const { error: anonRequest } = await signedIn.from("order_requests").update({ status: "approved" }).eq("id", reopened.id).select();
+  const { data: unchanged } = await admin.from("order_requests").select("status").eq("id", reopened.id).single();
+  check("회원이 직접 요청을 승인할 수 없음", unchanged.status === "pending" || Boolean(anonRequest));
+  check("대기 주문에는 요청 불가", (await userA(`/api/orders/${orderNumber}/requests`, "POST", { type: "cancel", reason: "사유" })).status === 409);
+
   // 회원 관리
   check("비회원 회원 목록 거절", (await guest("/api/admin/members")).status === 401);
   check("일반 회원 회원 목록 거절", (await userB("/api/admin/members")).status === 403);
