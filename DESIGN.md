@@ -450,7 +450,7 @@ AI에게 보내는 규칙은 `lib/chat-prompt.ts`에 모으고, 고정 문구는
 
 ### 상품 관리
 
-`GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 계정 정보는 `.env`의 `ADMIN_LOGIN_EMAIL`, `ADMIN_INITIAL_PASSWORD`에 있다. 그림은 일러스트 10종 중에서 고른다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
+`GET /api/products`는 누구나 볼 수 있고, `POST /api/products`, `PATCH·DELETE /api/products/[id]`는 관리자만 쓸 수 있다. 관리자 여부는 `profiles.is_admin`으로 판단하며 회원은 이 값을 바꿀 수 없다. 관리자 비밀번호는 파일에 두지 않고 Supabase Auth만 관리한다. 그림은 일러스트 10종 중에서 고른다. 상품을 삭제하면 장바구니에서도 빠지고, 지난 주문은 주문 당시 정보로 남는다.
 
 ### 회원 관리
 

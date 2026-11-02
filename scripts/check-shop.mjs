@@ -143,8 +143,13 @@ try {
   const { data: stillUser } = await admin.from("profiles").select("is_admin").eq("id", meB.id).single();
   check("회원이 스스로 관리자가 될 수 없음", stillUser.is_admin === false || Boolean(selfAdmin));
 
+  // 실제 관리자 비밀번호를 쓰지 않도록 임시 관리자를 만들어 시험하고 지운다.
   const manager = createBrowser();
-  check("관리자 로그인", (await manager("/api/auth/login", "POST", { email: process.env.ADMIN_LOGIN_EMAIL, password: process.env.ADMIN_INITIAL_PASSWORD })).status === 200);
+  const accountM = newAccount();
+  const { data: tempAdmin } = await admin.auth.admin.createUser({ email: accountM.email, password: accountM.password, email_confirm: true });
+  createdIds.push(tempAdmin.user.id);
+  await admin.from("profiles").insert({ id: tempAdmin.user.id, name: "임시 관리자", phone: "010-0000-0000", agreed_terms_at: new Date().toISOString(), agreed_privacy_at: new Date().toISOString(), is_admin: true });
+  check("관리자 로그인", (await manager("/api/auth/login", "POST", { email: accountM.email, password: accountM.password })).status === 200);
   check("관리자 표시", (await manager("/api/auth/me")).body?.user?.isAdmin === true);
   check("가격 0 거절", (await manager("/api/products", "POST", { ...sample, price: 0 })).status === 400);
   check("없는 그림 거절", (await manager("/api/products", "POST", { ...sample, image: "https://example.com/x.png" })).status === 400);
@@ -216,7 +221,7 @@ try {
   const listedA = memberList.body?.members?.find(({ id }) => id === me.id);
   check("관리자는 회원 목록을 봄", listedA?.email === accountA.email);
   check("회원 목록에 연락처를 보내지 않음", listedA && !("phone" in listedA));
-  const adminMember = memberList.body.members.find(({ isAdmin }) => isAdmin);
+  const adminMember = memberList.body.members.find(({ id }) => id === tempAdmin.user.id);
   check("관리자 계정은 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
   check("관리자 계정은 스스로 탈퇴 불가", (await manager("/api/auth/me", "DELETE")).status === 409);
   check("없는 회원 탈퇴 처리는 404", (await manager("/api/admin/members/00000000-0000-0000-0000-000000000000", "DELETE")).status === 404);
