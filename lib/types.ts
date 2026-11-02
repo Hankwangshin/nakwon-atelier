@@ -23,6 +23,54 @@ export const CHAT_KINDS = [
 
 export type ChatKind = (typeof CHAT_KINDS)[number];
 
+// Design Ref: §5 — AI가 고르는 답변 종류와 받는 사람 값
+export const AI_KINDS = [
+  "answer",
+  "question",
+  "recommendation",
+  "cannot_answer",
+  "refusal",
+] as const;
+
+export const RECIPIENTS = [
+  "학생",
+  "직장 동료",
+  "선생님",
+  "부모님",
+  "친구",
+  "아이",
+  "기타",
+] as const;
+
+// Design Ref: §5 — AI가 돌려주는 양식
+export interface AiReply {
+  kind: (typeof AI_KINDS)[number];
+  message: string;
+  sourceProductIds: string[];
+  mentionsStock: boolean;
+  budget: number | null;
+  budgetType: "total" | "perPerson" | null;
+  recipientCount: number | null;
+  recipient: (typeof RECIPIENTS)[number] | null;
+  recommendations: { productId: string; reason: string }[];
+}
+
+// Design Ref: §5 — 서버가 화면으로 보내는 추천 카드 1개
+export interface ProductCardData {
+  name: string;
+  price: number;
+  shipping: string;
+  reason: string;
+}
+
+// Design Ref: §5 — 서버가 화면으로 보내는 성공 응답
+export interface ChatResponse {
+  kind: ChatKind;
+  message: string;
+  notices: string[];
+  products: ProductCardData[];
+}
+
 // Design Ref: §5 — 브라우저가 보내는 대화 기록 1개
 export interface HistoryItem {
   role: "user" | "assistant";

@@ -1,11 +1,14 @@
 import OpenAI, { APIConnectionTimeoutError } from "openai";
+import { AI_REPLY_SCHEMA, buildSystemPrompt } from "@/lib/chat-prompt";
 import {
   MAX_ASSISTANT_LENGTH,
   MAX_HISTORY_ITEMS,
   MAX_QUESTION_LENGTH,
 } from "@/lib/limits";
+import { products } from "@/lib/products";
 import { CHAT_KINDS } from "@/lib/types";
 import type { ChatKind, HistoryItem } from "@/lib/types";
+import { parseAiReply, verifyReply } from "@/lib/verify-reply";
 
 // 모델을 바꿀 때는 이 값만 고치면 된다.
 const MODEL = "gpt-6-luna";
@@ -13,11 +16,16 @@ const MODEL = "gpt-6-luna";
 // Design Ref: §7 — OpenAI가 20초 안에 답하지 않으면 오류로 처리한다.
 const AI_TIMEOUT_MS = 20000;
 
-// 작업 9번에서 상품 문서와 AI 규칙(lib/chat-prompt.ts)으로 바꾼다.
-const SYSTEM_PROMPT = "당신은 문구 쇼핑몰의 챗봇입니다. 한국어로 3문장 이내로 답하세요.";
-
 function errorResponse(code: string, message: string, status: number) {
   return Response.json({ error: { code, message } }, { status });
+}
+
+function aiFailedResponse() {
+  return errorResponse(
+    "AI_FAILED",
+    "답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    502,
+  );
 }
 
 function isValidHistoryItem(item: unknown): boolean {
@@ -80,19 +88,28 @@ export async function POST(request: Request) {
     const completion = await openai.chat.completions.create({
       model: MODEL,
       store: false,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "chat_reply",
+          strict: true,
+          schema: AI_REPLY_SCHEMA,
+        },
+      },
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        // Design Ref: §8 — 고객 입력은 문서가 아닌 일반 대화로 따로 전달한다.
+        { role: "system", content: buildSystemPrompt(products) },
         ...history.map(({ role, content }) => ({ role, content })),
         { role: "user", content: message },
       ],
     });
 
-    return Response.json({
-      kind: "answer",
-      message: completion.choices[0]?.message.content ?? "",
-      notices: [],
-      products: [],
-    });
+    const reply = parseAiReply(completion.choices[0]?.message.content);
+    if (!reply) {
+      console.error("chat failed: invalid reply format");
+      return aiFailedResponse();
+    }
+    return Response.json(verifyReply(reply, products, history));
   } catch (error) {
     // Design Ref: §8 — 오류 기록에는 상태 코드만 남기고 질문 내용은 남기지 않는다.
     console.error("chat failed:", (error as { status?: number }).status);
@@ -104,10 +121,6 @@ export async function POST(request: Request) {
         504,
       );
     }
-    return errorResponse(
-      "AI_FAILED",
-      "답변을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      502,
-    );
+    return aiFailedResponse();
   }
 }

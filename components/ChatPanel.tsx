@@ -14,6 +14,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   kind?: ChatKind;
+  notices?: string[]; // 기준일, 재고 확인 문구 같은 부가 안내
   isLocal?: boolean; // 첫 안내처럼 서버로 보내지 않는 말풍선
 }
 
@@ -98,6 +99,7 @@ export default function ChatPanel() {
         role: "assistant",
         content: reply.message,
         kind: reply.kind,
+        notices: reply.notices,
       });
     } catch {
       setFailedRequest({
@@ -128,11 +130,17 @@ export default function ChatPanel() {
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
         {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            role={message.role}
-            content={message.content}
-          />
+          <div key={message.id} className="flex flex-col gap-1">
+            <MessageBubble role={message.role} content={message.content} />
+            {message.notices?.map((notice) => (
+              <p
+                key={notice}
+                className="px-1 text-xs text-zinc-600 dark:text-zinc-400"
+              >
+                {notice}
+              </p>
+            ))}
+          </div>
         ))}
         {isLoading && (
           <p role="status" className="text-sm text-zinc-600 dark:text-zinc-400">
