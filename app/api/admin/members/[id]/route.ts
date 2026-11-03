@@ -1,9 +1,11 @@
 import { denyUnlessAllowed } from "@/lib/admin";
 import { isAdminScope } from "@/lib/admin-scopes";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
+import { findOptionalAddressProblem, findProfileProblem } from "@/lib/member-input";
 import { createAdminClient, getCurrentUser } from "@/lib/supabase";
 
-// 회원의 등급과 관리 권한 범위를 바꾼다.
+// 회원의 등급과 관리 권한 범위를 바꾼다. 성명이 함께 오면 성명, 휴대폰,
+// 주소지, 배송지도 회원가입과 같은 기준으로 검사해 함께 바꾼다.
 export async function PATCH(
   request: Request,
   context: RouteContext<"/api/admin/members/[id]">,
@@ -14,13 +16,23 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => null);
-  const { tierId, adminScopes } = body ?? {};
+  const { tierId, adminScopes, name, phone, address, shippingAddress } = body ?? {};
   if (
     typeof tierId !== "string" ||
     !Array.isArray(adminScopes) ||
     !adminScopes.every(isAdminScope)
   ) {
     return errorResponse("INVALID_INPUT", "등급과 권한을 확인해 주세요.", 400);
+  }
+  const hasProfile = name !== undefined;
+  if (hasProfile) {
+    const problem =
+      findProfileProblem(name, phone) ??
+      findOptionalAddressProblem(address, "주소지") ??
+      findOptionalAddressProblem(shippingAddress, "배송지");
+    if (problem) {
+      return errorResponse("INVALID_INPUT", problem, 400);
+    }
   }
 
   const { id } = await context.params;
@@ -56,7 +68,17 @@ export async function PATCH(
 
   const { error } = await admin
     .from("profiles")
-    .update({ tier_id: tier.id, admin_scopes: [...new Set(adminScopes)] })
+    .update({
+      tier_id: tier.id,
+      admin_scopes: [...new Set(adminScopes)],
+      ...(hasProfile && {
+        name: name.trim(),
+        phone,
+        // 빈 주소는 DB 규칙(1~200자)에 맞게 값 없음으로 저장한다.
+        address: address.trim() || null,
+        shipping_address: shippingAddress.trim() || null,
+      }),
+    })
     .eq("id", id);
 
   if (error) {

@@ -28,3 +28,12 @@ export function findAddressProblem(address: unknown, label: string): string | nu
 export function findAddressesProblem(address: unknown, shippingAddress: unknown): string | null {
   return findAddressProblem(address, "주소지") ?? findAddressProblem(shippingAddress, "배송지");
 }
+
+// 관리자가 회원 정보를 고칠 때 쓴다. 주소 칸이 생기기 전에 가입한 회원이 있어
+// 주소지와 배송지는 비워 둘 수 있고, 적었다면 같은 기준으로 검사한다.
+export function findOptionalAddressProblem(address: unknown, label: string): string | null {
+  if (address === "" || (typeof address === "string" && address.trim() === "")) {
+    return null;
+  }
+  return findAddressProblem(address, label);
+}

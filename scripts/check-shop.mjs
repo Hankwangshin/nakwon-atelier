@@ -54,6 +54,8 @@ const newAccount = () => ({
   password: randomBytes(12).toString("hex"),
   name: "시험 회원",
   phone: "010-0000-0000",
+  address: "샘플 주소지 1",
+  shippingAddress: "샘플 배송지 1",
   isOver14: true,
   agreeTerms: true,
   agreePrivacy: true,
@@ -366,7 +368,25 @@ try {
   const memberList = await manager("/api/admin/members");
   const listedA = memberList.body?.members?.find(({ id }) => id === me.id);
   check("관리자는 회원 목록을 봄", listedA?.email === accountA.email);
-  check("회원 목록에 연락처를 보내지 않음", listedA && !("phone" in listedA));
+  check("회원 목록에 상세 정보 포함", listedA?.phone === accountA.phone && listedA.shippingAddress === accountA.shippingAddress);
+  const searchNames = async (field, q) => (await manager(`/api/admin/members?${new URLSearchParams({ field, q })}`)).body?.members?.map(({ id }) => id) ?? [];
+  const emailPart = accountA.email.slice(0, 20).toUpperCase();
+  check("아이디 검색(대소문자 무시)", (await searchNames("email", emailPart)).join() === me.id);
+  check("성명 검색에는 아이디가 안 걸림", !(await searchNames("name", emailPart)).includes(me.id));
+  check("전체 검색은 아이디도 찾음", (await searchNames("all", emailPart)).includes(me.id));
+  check("성명 검색", (await searchNames("name", "임시 관리자")).includes(tempAdmin.user.id));
+  check("없는 검색 조건 거절", (await manager("/api/admin/members?field=phone&q=010")).status === 400);
+  check("51자 검색어 거절", (await manager(`/api/admin/members?field=all&q=${"가".repeat(51)}`)).status === 400);
+  check("일반 회원 검색 거절", (await userB("/api/admin/members?field=all&q=a")).status === 403);
+  const memberEdit = { tierId: defaultTier.id, adminScopes: [], name: "관리자가 고친 이름", phone: "010-3333-4444", address: "고친 주소지", shippingAddress: "" };
+  check("관리자 수정 시 휴대폰 형식 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, phone: "1234" })).status === 400);
+  check("관리자 수정 시 빈 성명 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: " " })).status === 400);
+  check("관리자 수정 시 긴 주소 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, address: "가".repeat(201) })).status === 400);
+  check("관리자가 회원 정보 수정", (await manager(memberUrl(me.id), "PATCH", memberEdit)).status === 200);
+  const editedByAdmin = (await manager("/api/admin/members?field=name&q=관리자가 고친")).body.members.find(({ id }) => id === me.id);
+  check("수정한 값이 목록에 반영, 빈 배송지는 비움", editedByAdmin?.phone === "010-3333-4444" && editedByAdmin.address === "고친 주소지" && editedByAdmin.shippingAddress === "");
+  check("본인(전체 관리자) 정보 수정 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", memberEdit)).status === 403);
+  await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: "시험 회원" });
   const adminMember = memberList.body.members.find(({ id }) => id === tempAdmin.user.id);
   check("관리자 계정은 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
   check("관리자 계정은 스스로 탈퇴 불가", (await manager("/api/auth/me", "DELETE")).status === 409);
@@ -380,7 +400,7 @@ try {
   check("탈퇴 처리 시 회원 정보와 장바구니 삭제", bProfile.length === 0 && bCart.length === 0);
 
   // 내 정보 수정
-  const profileEdit = { name: "바뀐 이름", phone: "010-1111-2222", password: accountA.password };
+  const profileEdit = { name: "바뀐 이름", phone: "010-1111-2222", address: "바뀐 주소지", shippingAddress: "바뀐 배송지", password: accountA.password };
   const readProfile = async () => (await admin.from("profiles").select("name, phone").eq("id", me.id).single()).data;
   check("비회원 내 정보 수정 거절", (await guest("/api/auth/me", "PATCH", profileEdit)).status === 401);
   check("비밀번호 없으면 수정 거절", (await userA("/api/auth/me", "PATCH", { ...profileEdit, password: undefined })).status === 400);

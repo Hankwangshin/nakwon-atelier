@@ -6,3 +6,4 @@ export const MAX_HISTORY_ITEMS = 10; // Design Ref: §6 — 현재 질문을 뺀
 export const MAX_DISCOUNT_PERCENT = 50; // PRD 6번 — 회원 등급 할인율 상한
 export const MAX_TIER_NAME_LENGTH = 20;
 export const MAX_ADDRESS_LENGTH = 200; // 주소지·배송지 글자 수 (DB 제한과 같게)
+export const MAX_MEMBER_SEARCH_LENGTH = 50; // 회원 관리 검색어 글자 수

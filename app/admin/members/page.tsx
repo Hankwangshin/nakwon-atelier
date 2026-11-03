@@ -2,28 +2,43 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import MemberDetail, { formatJoinedAt } from "@/components/MemberDetail";
+import type { Member, MemberChanges } from "@/components/MemberDetail";
 import TierManager from "@/components/TierManager";
 import type { Tier } from "@/components/TierManager";
 import { ADMIN_SCOPES } from "@/lib/admin-scopes";
-import type { AdminScope } from "@/lib/admin-scopes";
 import { callApi } from "@/lib/client-api";
 import type { ApiResult } from "@/lib/client-api";
+import { MAX_MEMBER_SEARCH_LENGTH } from "@/lib/limits";
+import { MEMBER_SEARCH_FIELDS } from "@/lib/member-search";
+import type { MemberSearchField } from "@/lib/member-search";
 
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  isAdmin: boolean;
-  isSelf: boolean;
-  tierId: string | null;
-  adminScopes: AdminScope[];
-  joinedAt: string;
+interface Search {
+  field: MemberSearchField;
+  query: string;
+}
+
+const EMPTY_SEARCH: Search = { field: "all", query: "" };
+
+const INPUT_CLASS =
+  "rounded-lg border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700";
+
+function membersUrl({ field, query }: Search) {
+  const params = new URLSearchParams({ field, q: query.trim() });
+  return `/api/admin/members?${params}`;
 }
 
 export default function AdminMembersPage() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [tiers, setTiers] = useState<Tier[]>([]);
+  // 입력 중인 검색 조건과 실제로 조회한 검색 조건을 따로 둔다.
+  const [draft, setDraft] = useState<Search>(EMPTY_SEARCH);
+  const [search, setSearch] = useState<Search>(EMPTY_SEARCH);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 저장할 때마다 늘려 상세 입력칸을 저장된 값으로 다시 채운다.
+  const [savedCount, setSavedCount] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -33,15 +48,22 @@ export default function AdminMembersPage() {
         router.replace("/");
         return;
       }
-      setMembers(result.data?.members ?? []);
       setError(result.ok ? "" : result.errorMessage);
+      if (result.ok) {
+        setMembers(result.data?.members ?? []);
+      } else {
+        setMembers((current) => current ?? []);
+      }
     },
     [router],
   );
 
-  const loadMembers = useCallback(async () => {
-    showMembers(await callApi<{ members: Member[] }>("/api/admin/members"));
-  }, [showMembers]);
+  const loadMembers = useCallback(
+    async (target: Search) => {
+      showMembers(await callApi<{ members: Member[] }>(membersUrl(target)));
+    },
+    [showMembers],
+  );
 
   const loadTiers = useCallback(async () => {
     const result = await callApi<{ tiers: Tier[] }>("/api/admin/tiers");
@@ -49,7 +71,7 @@ export default function AdminMembersPage() {
   }, []);
 
   useEffect(() => {
-    callApi<{ members: Member[] }>("/api/admin/members").then(showMembers);
+    callApi<{ members: Member[] }>(membersUrl(EMPTY_SEARCH)).then(showMembers);
     callApi<{ tiers: Tier[] }>("/api/admin/tiers").then((result) => {
       setTiers(result.data?.tiers ?? []);
     });
@@ -58,30 +80,63 @@ export default function AdminMembersPage() {
   // 등급을 지정받지 않은 회원은 기본 등급으로 보여 준다.
   const tierIdOf = (member: Member) =>
     member.tierId ?? tiers.find(({ isDefault }) => isDefault)?.id ?? "";
+  const tierNameOf = (member: Member) =>
+    tiers.find(({ id }) => id === tierIdOf(member))?.name ?? "-";
+  const scopesOf = (member: Member) =>
+    member.isAdmin
+      ? "전체"
+      : ADMIN_SCOPES.filter(({ id }) => member.adminScopes.includes(id))
+          .map(({ label }) => label)
+          .join(", ") || "-";
 
-  async function updateMember(
-    member: Member,
-    changes: { tierId?: string; adminScopes?: AdminScope[] },
-  ) {
+  const selected = members?.find(({ id }) => id === selectedId) ?? null;
+
+  async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setMessage("");
-    const result = await callApi(`/api/admin/members/${member.id}`, "PATCH", {
-      tierId: tierIdOf(member),
-      adminScopes: member.adminScopes,
-      ...changes,
-    });
+    setSearch(draft);
+    await loadMembers(draft);
+  }
+
+  async function handleReset() {
+    setMessage("");
+    setDraft(EMPTY_SEARCH);
+    setSearch(EMPTY_SEARCH);
+    await loadMembers(EMPTY_SEARCH);
+  }
+
+  function selectMember(member: Member) {
+    setSelectedId(member.id);
+    setMessage("");
+    setError("");
+  }
+
+  // Enter나 스페이스로 고르고, 위·아래 화살표로 다음 행으로 옮겨 간다.
+  function handleRowKeyDown(event: React.KeyboardEvent<HTMLTableRowElement>, member: Member) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectMember(member);
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const row = event.currentTarget;
+      const next = event.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+      (next as HTMLElement | null)?.focus();
+    }
+  }
+
+  async function handleSave(member: Member, changes: MemberChanges) {
+    setMessage("");
+    setIsSaving(true);
+    const result = await callApi(`/api/admin/members/${member.id}`, "PATCH", changes);
+    setIsSaving(false);
     if (!result.ok) {
       setError(result.errorMessage);
       return;
     }
-    await loadMembers();
-    setMessage(`${member.name} 회원의 정보를 바꿨습니다.`);
-  }
-
-  function toggleScope(member: Member, scope: AdminScope) {
-    const adminScopes = member.adminScopes.includes(scope)
-      ? member.adminScopes.filter((item) => item !== scope)
-      : [...member.adminScopes, scope];
-    updateMember(member, { adminScopes });
+    setError("");
+    await loadMembers(search);
+    setSavedCount((count) => count + 1);
+    setMessage(`${changes.name.trim()} 회원의 정보를 저장했습니다.`);
   }
 
   async function handleWithdraw(member: Member) {
@@ -99,21 +154,19 @@ export default function AdminMembersPage() {
       return;
     }
     setError("");
+    setSelectedId(null);
     setMessage("탈퇴 처리했습니다.");
-    await loadMembers();
+    await loadMembers(search);
   }
 
   if (!members) {
     return <main className="px-4 py-6 text-sm">권한을 확인하는 중</main>;
   }
 
-  return (
-    <main className="mx-auto w-full max-w-3xl px-4 xl:max-w-5xl py-6 text-sm">
-      <h1 className="text-xl font-semibold">회원 관리</h1>
-      <p className="mt-1 text-zinc-600 dark:text-zinc-400">회원 {members.length}명</p>
-
-      <TierManager tiers={tiers} onChanged={loadTiers} />
-
+  const isSearching = search.query.trim() !== "";
+  // 회원을 골랐으면 상세 정보 안에, 아니면 표 위에 안내를 보여 준다.
+  const notice = (
+    <>
       {error && (
         <p role="alert" className="mt-3 text-red-600 dark:text-red-400">
           {error}
@@ -124,71 +177,137 @@ export default function AdminMembersPage() {
           {message}
         </p>
       )}
+    </>
+  );
 
-      <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-700">
-        {members.map((member) => {
-          const isLocked = member.isAdmin || member.isSelf;
-          return (
-            <li key={member.id} className="flex flex-col gap-2 py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="min-w-48 flex-1">
-                  <p className="font-medium">
+  return (
+    <main className="mx-auto w-full page-wide px-4 py-6 text-sm">
+      <h1 className="text-xl font-semibold">회원 관리</h1>
+
+      <TierManager tiers={tiers} onChanged={loadTiers} />
+
+      <form
+        role="search"
+        onSubmit={handleSearch}
+        className="mt-4 flex flex-wrap items-end gap-2"
+      >
+        <label className="flex flex-col gap-1">
+          검색 조건
+          <select
+            value={draft.field}
+            onChange={(event) =>
+              setDraft({ ...draft, field: event.target.value as MemberSearchField })
+            }
+            className={INPUT_CLASS}
+          >
+            {MEMBER_SEARCH_FIELDS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex min-w-48 flex-1 flex-col gap-1 sm:max-w-sm">
+          검색어
+          <input
+            type="search"
+            maxLength={MAX_MEMBER_SEARCH_LENGTH}
+            value={draft.query}
+            onChange={(event) => setDraft({ ...draft, query: event.target.value })}
+            placeholder="아이디(이메일)나 성명"
+            className={INPUT_CLASS}
+          />
+        </label>
+        <button
+          type="submit"
+          className="rounded-lg bg-zinc-900 px-4 py-1.5 text-white dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          검색
+        </button>
+        {isSearching && (
+          <button type="button" onClick={handleReset} className="px-2 py-1.5 underline">
+            전체 보기
+          </button>
+        )}
+      </form>
+
+      <p className="mt-3 text-zinc-600 dark:text-zinc-400" aria-live="polite">
+        {isSearching ? `검색 결과 ${members.length}명` : `회원 ${members.length}명`}
+        {members.length > 0 && " · 행을 누르면 아래에 상세 정보가 나옵니다."}
+      </p>
+
+      {!selected && notice}
+
+      {/* 휴대폰처럼 좁은 화면에서는 표만 가로로 밀어서 본다. */}
+      <div className="mt-3 max-h-[28rem] overflow-auto rounded-xl border border-zinc-200 bg-white/80 dark:border-zinc-700 dark:bg-zinc-900/80">
+        <table className="w-full min-w-[44rem] border-collapse text-left">
+          <caption className="sr-only">회원 목록. 행을 고르면 아래에 상세 정보가 나옵니다.</caption>
+          <thead className="sticky top-0 bg-zinc-100 dark:bg-zinc-800">
+            <tr>
+              {["아이디", "성명", "휴대폰", "등급", "관리 권한", "가입일"].map((title) => (
+                <th key={title} scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+                  {title}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {members.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-zinc-600 dark:text-zinc-400">
+                  {isSearching ? "검색어에 맞는 회원이 없습니다." : "회원이 없습니다."}
+                </td>
+              </tr>
+            )}
+            {members.map((member) => {
+              const isSelected = member.id === selectedId;
+              return (
+                <tr
+                  key={member.id}
+                  tabIndex={0}
+                  aria-current={isSelected ? "true" : undefined}
+                  onClick={() => selectMember(member)}
+                  onKeyDown={(event) => handleRowKeyDown(event, member)}
+                  className={`cursor-pointer border-t border-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:border-zinc-700 ${
+                    isSelected
+                      ? "bg-blue-100 font-medium dark:bg-blue-900/60"
+                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <td className="px-3 py-2 break-all">{member.email}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {member.name}
-                    {member.isAdmin && (
-                      <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">전체 관리자</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                    {member.email} · {new Date(member.joinedAt).toLocaleDateString("ko-KR")} 가입
-                  </p>
-                </div>
-                <label className="flex items-center gap-1">
-                  등급
-                  <select
-                    value={tierIdOf(member)}
-                    disabled={isLocked}
-                    onChange={(event) => updateMember(member, { tierId: event.target.value })}
-                    className="rounded-lg border border-zinc-300 bg-transparent px-2 py-1 disabled:opacity-50 dark:border-zinc-700"
-                  >
-                    {tiers.map(({ id, name, discountPercent }) => (
-                      <option key={id} value={id}>
-                        {name} ({discountPercent}%)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!member.isAdmin && !member.isSelf && (
-                  <button
-                    type="button"
-                    onClick={() => handleWithdraw(member)}
-                    className="text-red-600 underline dark:text-red-400"
-                  >
-                    탈퇴 처리
-                  </button>
-                )}
-              </div>
-              {member.isAdmin ? (
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">모든 관리 권한이 있습니다.</p>
-              ) : (
-                <fieldset className="flex flex-wrap gap-3 text-xs">
-                  <legend className="sr-only">{member.name} 관리 권한</legend>
-                  {ADMIN_SCOPES.map(({ id, label }) => (
-                    <label key={id} className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={member.adminScopes.includes(id)}
-                        disabled={isLocked}
-                        onChange={() => toggleScope(member, id)}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                    {member.isSelf && <span className="ml-1 text-xs text-zinc-500">(나)</span>}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">{member.phone}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{tierNameOf(member)}</td>
+                  <td className="px-3 py-2">{scopesOf(member)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{formatJoinedAt(member.joinedAt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {selected ? (
+        <MemberDetail
+          key={`${selected.id}-${savedCount}`}
+          member={selected}
+          tierId={tierIdOf(selected)}
+          tiers={tiers}
+          isSaving={isSaving}
+          notice={notice}
+          onSave={(changes) => handleSave(selected, changes)}
+          onWithdraw={() => handleWithdraw(selected)}
+        />
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-white/60 p-4 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+          {selectedId
+            ? "고른 회원이 지금 목록에 없습니다. 다른 회원을 골라 주세요."
+            : "표에서 회원을 고르면 여기에 상세 정보가 나옵니다."}
+        </p>
+      )}
     </main>
   );
 }
