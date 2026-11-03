@@ -3,6 +3,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* 사이트 전체 배경 그림 */
+  --background-image: url("/backgrounds/atelier.webp");
 }
 
 @theme inline {
@@ -16,11 +18,20 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    /* 밝은 그림이라 어두운 화면에서는 반투명 검정을 덮어 글자가 잘 보이게 한다. */
+    --background-image:
+      linear-gradient(rgb(10 10 10 / 0.85), rgb(10 10 10 / 0.85)),
+      url("/backgrounds/atelier.webp");
   }
 }
 
+/* 본문만 스크롤되므로 배경 그림은 화면에 고정된 채 보인다. */
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: var(--background-image);
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
