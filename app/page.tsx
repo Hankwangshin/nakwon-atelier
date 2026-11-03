@@ -9,12 +9,16 @@ import { CATEGORIES, productsInCategory } from "@/lib/categories";
 
 // 6개면 휴대폰 2칸, 태블릿 3칸, PC 6칸에서 모두 줄이 딱 맞는다.
 const FEATURED_COUNT = 6;
+// 새로 들어온 상품은 PC에서 두 줄을 채운다.
+const NEW_COUNT = 12;
 
 export default function Home() {
   const { products, error } = useProducts();
+  // 상품 API는 등록 순서(오래된 것부터)로 주므로, 뒤집어 최신 등록 상품부터 보여 준다.
+  const newestFirst = [...(products ?? [])].reverse();
   const sections = CATEGORIES.map((category) => ({
     ...category,
-    products: productsInCategory(products ?? [], category.id),
+    products: productsInCategory(newestFirst, category.id),
   })).filter((section) => section.products.length > 0);
 
   return (
@@ -53,6 +57,20 @@ export default function Home() {
         <p role="alert" className="mt-6 text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
+      )}
+
+      {newestFirst.length > 0 && (
+        <section aria-labelledby="new-arrivals" className="mt-8">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 id="new-arrivals" className="text-lg font-semibold">
+              새로 들어온 상품
+            </h2>
+            <Link href="/products" className="text-sm text-stone-500 dark:text-stone-400">
+              전체 보기
+            </Link>
+          </div>
+          <ProductGrid products={newestFirst.slice(0, NEW_COUNT)} />
+        </section>
       )}
 
       <nav
