@@ -108,7 +108,7 @@ export default function AdminMembersPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 text-sm">
+    <main className="mx-auto w-full max-w-3xl px-4 xl:max-w-5xl py-6 text-sm">
       <h1 className="text-xl font-semibold">회원 관리</h1>
       <p className="mt-1 text-zinc-600 dark:text-zinc-400">회원 {members.length}명</p>
 

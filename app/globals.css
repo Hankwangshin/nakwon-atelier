@@ -24,3 +24,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 넓은 화면용 본문 폭. 1920px 모니터에서는 좌우 여백을 남기고 1536px까지 넓어진다. */
+@utility page-wide {
+  max-width: 80rem;
+  @media (width >= 96rem) {
+    max-width: 96rem;
+  }
+}

@@ -71,7 +71,7 @@ export default function AdminRequestsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 text-sm">
+    <main className="mx-auto w-full max-w-3xl px-4 xl:max-w-5xl py-6 text-sm">
       <h1 className="text-xl font-semibold">교환·취소 요청</h1>
       {error && (
         <p role="alert" className="mt-3 text-red-600 dark:text-red-400">

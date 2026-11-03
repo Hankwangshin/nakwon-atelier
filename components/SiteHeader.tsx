@@ -46,7 +46,7 @@ export default function SiteHeader() {
       <p className="bg-amber-100 px-4 py-1 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
         실습용 샘플 쇼핑몰입니다. 실제 개인정보를 입력하지 마세요. 결제는 테스트로만 진행됩니다.
       </p>
-      <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm">
+      <nav className="mx-auto flex page-wide flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm">
         <Link href="/" className="font-semibold">
           낙원 아뜰리에
         </Link>

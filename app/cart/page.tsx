@@ -41,7 +41,7 @@ export default function CartPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 text-sm">
+    <main className="mx-auto w-full max-w-3xl px-4 py-6 text-sm lg:max-w-5xl">
       <h1 className="text-xl font-semibold">장바구니</h1>
       {!cart && <p className="mt-4">불러오는 중</p>}
       {cart?.lines.length === 0 && (
@@ -50,8 +50,9 @@ export default function CartPage() {
         </p>
       )}
       {cart && cart.lines.length > 0 && (
-        <>
-          <ul className="mt-4 flex flex-col gap-3">
+        // PC에서는 상품 목록을 왼쪽, 결제 금액을 오른쪽에 둔다.
+        <div className="mt-4 lg:grid lg:grid-cols-[1fr_20rem] lg:items-start lg:gap-6">
+          <ul className="flex flex-col gap-3">
             {cart.lines.map((line) => (
               <li
                 key={line.productId}
@@ -99,44 +100,46 @@ export default function CartPage() {
             ))}
           </ul>
 
-          {error && (
-            <p role="alert" className="mt-3 text-red-600 dark:text-red-400">
-              {error}
-            </p>
-          )}
-
-          <dl className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900">
-            <dt>상품 금액</dt>
-            <dd className="text-right">{formatPrice(cart.itemsAmount)}</dd>
-            {cart.discountAmount > 0 && (
-              <>
-                <dt>
-                  {cart.discount.tierName} 등급 할인 ({cart.discount.percent}%)
-                </dt>
-                <dd className="text-right text-red-600 dark:text-red-400">
-                  -{formatPrice(cart.discountAmount)}
-                </dd>
-              </>
+          <div className="lg:sticky lg:top-4">
+            {error && (
+              <p role="alert" className="mt-3 text-red-600 lg:mt-0 lg:mb-3 dark:text-red-400">
+                {error}
+              </p>
             )}
-            <dt>배송비 (묶음 배송)</dt>
-            <dd className="text-right">{formatPrice(cart.shippingFee)}</dd>
-            <dt className="font-semibold">결제 금액</dt>
-            <dd className="text-right font-semibold">{formatPrice(cart.amount)}</dd>
-          </dl>
 
-          {isOrderable(cart.lines) ? (
-            <Link
-              href="/checkout"
-              className="mt-4 block rounded-lg bg-blue-600 px-4 py-2 text-center font-medium text-white"
-            >
-              주문하기
-            </Link>
-          ) : (
-            <p className="mt-4 text-red-600 dark:text-red-400">
-              품절 상품을 삭제하거나 수량을 줄여야 주문할 수 있습니다.
-            </p>
-          )}
-        </>
+            <dl className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-zinc-50 p-3 lg:mt-0 dark:bg-zinc-900">
+              <dt>상품 금액</dt>
+              <dd className="text-right">{formatPrice(cart.itemsAmount)}</dd>
+              {cart.discountAmount > 0 && (
+                <>
+                  <dt>
+                    {cart.discount.tierName} 등급 할인 ({cart.discount.percent}%)
+                  </dt>
+                  <dd className="text-right text-red-600 dark:text-red-400">
+                    -{formatPrice(cart.discountAmount)}
+                  </dd>
+                </>
+              )}
+              <dt>배송비 (묶음 배송)</dt>
+              <dd className="text-right">{formatPrice(cart.shippingFee)}</dd>
+              <dt className="font-semibold">결제 금액</dt>
+              <dd className="text-right font-semibold">{formatPrice(cart.amount)}</dd>
+            </dl>
+
+            {isOrderable(cart.lines) ? (
+              <Link
+                href="/checkout"
+                className="mt-4 block rounded-lg bg-blue-600 px-4 py-2 text-center font-medium text-white"
+              >
+                주문하기
+              </Link>
+            ) : (
+              <p className="mt-4 text-red-600 dark:text-red-400">
+                품절 상품을 삭제하거나 수량을 줄여야 주문할 수 있습니다.
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </main>
   );

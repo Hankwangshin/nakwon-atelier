@@ -81,7 +81,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 text-sm">
+    <main className="mx-auto w-full max-w-3xl px-4 xl:max-w-5xl py-6 text-sm">
       <h1 className="text-xl font-semibold">주문 내역</h1>
       {needsLogin && (
         <p className="mt-4">

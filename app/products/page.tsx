@@ -7,7 +7,7 @@ export default function ProductsPage() {
   const { products, error } = useProducts();
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6">
+    <main className="mx-auto w-full page-wide px-4 py-6">
       <h1 className="mb-4 text-xl font-semibold">전체 상품</h1>
       {!products && <p className="text-sm">상품을 불러오는 중</p>}
       {error && (

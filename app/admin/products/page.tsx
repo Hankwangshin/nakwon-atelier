@@ -186,7 +186,7 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6 text-sm">
+    <main className="mx-auto w-full page-wide px-4 py-6 text-sm">
       <h1 className="text-xl font-semibold">상품 관리</h1>
 
       <form
