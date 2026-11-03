@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 낙원 아뜰리에 — 문구 만물
 
-## Getting Started
+소규모 문구·소품 판매자의 반복 문의를 줄이는 **AI 상담 챗봇이 있는 문구 쇼핑몰**입니다.
+고객은 상품 안내 문서를 근거로 상품 문의에 답을 받고, 예산과 받는 사람에 맞는 선물을 최대 3개까지 추천받은 뒤
+장바구니와 테스트 결제로 주문할 수 있습니다. 판매자(시스템관리자)는 상품·회원·교환·취소 요청을 화면에서 관리합니다.
 
-First, run the development server:
+> 실습용 샘플 쇼핑몰입니다. 실제 개인정보를 입력하지 마세요. 결제는 토스페이먼츠 **테스트 환경**으로만 진행되며 실제 금액이 빠져나가지 않습니다.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 배포 주소: (배포 후 추가)
+- 기획 문서: [PRD.md](PRD.md) (기능·범위·AI 규칙의 기준) · [PLAN.md](PLAN.md) (작업 순서와 진행 상태) · [DESIGN.md](DESIGN.md) (설계)
+- 테스트 결과: [test-results.md](test-results.md)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 주요 기능
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 챗봇 (로그인 없이 사용)
+- **상품 문의 답변**: 상품 안내 문서에 있는 내용으로만 답하고, 없으면 "확인할 수 없습니다"와 문의처를 안내합니다.
+- **선물 추천**: 예산·받는 사람이 빠지면 최대 2번까지 되묻고, 예산 이내·재고 있는 상품만 최대 3개 추천합니다. 예산·재고·개수는 서버에서도 다시 확인합니다.
+- **상품 소개, 쇼핑몰 이용 안내**(회원가입, 개인정보, 장바구니, 결제, 교환·취소)
+- AI 모델 선택(GPT-4o mini, GPT-6 Luna), 오류 시 "다시 시도", 질문 500자 제한, 대화 내용은 서버에 저장하지 않음
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 쇼핑몰
+- 회원가입(만 14세 이상, 필수 동의, 주소지·배송지), 로그인, 내 정보 수정(비밀번호 포함), 회원 탈퇴
+- 메인 화면의 "새로 들어온 상품"과 분류별 진열, 전체 상품, 장바구니(묶음 배송비, 등급 할인)
+- 주문서와 토스페이먼츠 테스트 결제(금액은 서버가 계산하고 승인 때 대조)
+- 주문 내역, 교환·결제 취소 요청, 내 정보의 지난 주문과 **재구매**
 
-## Learn More
+### 관리자 (시스템관리자 전용)
+- 상품 추가·수정·삭제, 사진 올리기, 보유수량·재고수량 관리(결제 시 차감, 취소 승인 시 복구)
+- 회원 관리: 전체·아이디·성명 검색, 회원 표와 상세의 수정·저장, 회원 추가, 비밀번호 재설정, 탈퇴 처리
+- 회원 구분(시스템관리자·일반·휴면·탈퇴)과 등급별 할인(VVIP 20%, VIP 15%, BEST 10%, GENERAL 0%)
+- 교환·결제 취소 요청 승인·거절
 
-To learn more about Next.js, take a look at the following resources:
+## 기술 스택
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| 구분 | 사용 기술 |
+|---|---|
+| 화면·서버 | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| AI | OpenAI API (서버 쪽에서만 호출) |
+| 회원·데이터 | Supabase (Auth, Postgres, RLS, Storage) |
+| 결제 | 토스페이먼츠 결제위젯 (테스트 키) |
+| 배포 | Vercel |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 직접 실행하기
 
-## Deploy on Vercel
+1. Node.js를 설치한 뒤 의존성을 설치합니다.
+   ```bash
+   npm install
+   ```
+2. 프로젝트 폴더에 `.env` 파일을 만들고 아래 값을 채웁니다. (값은 저장소에 올리지 않습니다)
+   ```
+   OPENAI_API_KEY=
+   SUPABASE_URL=
+   SUPABASE_ANON_KEY=
+   SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_TOSS_CLIENT_KEY=   # 토스페이먼츠 테스트 클라이언트 키
+   TOSS_SECRET_KEY=               # 토스페이먼츠 테스트 시크릿 키
+   ```
+3. Supabase에 `supabase/migrations/`의 SQL을 순서대로 적용합니다.
+4. 개발 서버를 실행하고 http://localhost:3000 을 엽니다.
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 점검 명령
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| 명령 | 내용 |
+|---|---|
+| `npm run lint`, `npm run build` | 코드 검사와 빌드 |
+| `node scripts/check-verify.mjs` | 가짜 AI 답변으로 서버 재확인 코드 점검 (비용 없음) |
+| `node scripts/check-shop.mjs` | 개발 서버를 켠 뒤 회원·장바구니·주문·권한 등 245개 점검 (임시 계정을 만들고 끝나면 지움) |
+| `node scripts/run-tests.mjs accuracy gift intro rules flows` | 실제 AI 호출로 정답률·응답 시간 측정 (소액 비용 발생) |
+
+## 알아 둘 점
+
+- 상품 정보는 공개 가능한 샘플 데이터입니다. 캐릭터 인형은 이름만 쓰고 실제 캐릭터 이미지는 쓰지 않으며, "공식"이나 "정품"이라고 표시하지 않습니다.
+- 개인정보 안내와 가입 동의 문구는 일반 설명이며 법률 자문이 아닙니다.
+- 문의: help@example.com (가상의 주소)

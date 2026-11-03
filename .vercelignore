@@ -1,0 +1,8 @@
+# Vercel에 올리지 않을 파일 (비밀 값, 로컬 작업 폴더)
+.env*
+trash-can
+.bkit
+.claude
+supabase/.temp
+node_modules
+.next
