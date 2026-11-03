@@ -38,3 +38,11 @@ export async function callApi<T>(
 export function formatPrice(price: number): string {
   return `${price.toLocaleString("ko-KR")}원`;
 }
+
+// 로그아웃한 뒤 메인 페이지를 새로 불러온다. 이 Next.js는 떠난 화면을 숨겨 두고
+// 다시 보여 주므로, 새로 불러야 앞 사람의 장바구니·입력값이 남지 않는다.
+export async function logout() {
+  await callApi("/api/auth/logout", "POST");
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 일부러 새로 불러온다(Next 문서 권장 방식)
+  window.location.href = "/";
+}
