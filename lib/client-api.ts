@@ -6,7 +6,9 @@ export interface ApiResult<T> {
   errorMessage: string;
 }
 
-const NETWORK_FAILURE = "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+export const LOGOUT_EVENT = "nakwon-logout";
+
+const NETWORK_FAILURE ="서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const DEFAULT_FAILURE = "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 
 export async function callApi<T>(

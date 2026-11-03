@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { callApi } from "@/lib/client-api";
+import { callApi, LOGOUT_EVENT } from "@/lib/client-api";
 
 const LINKS = [
   { href: "/products", label: "상품" },
@@ -34,6 +34,8 @@ export default function SiteHeader() {
     await callApi("/api/auth/logout", "POST");
     setIsLoggedIn(false);
     setIsAdmin(false);
+    // 메인 페이지에서는 주소가 그대로라, 로그인 칸에 따로 알려 준다.
+    window.dispatchEvent(new Event(LOGOUT_EVENT));
     router.push("/");
   }
 

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import HomeLoginCard from "@/components/HomeLoginCard";
+import MonthCalendar from "@/components/MonthCalendar";
 import ProductGrid from "@/components/ProductGrid";
 import { useProducts } from "@/components/useProducts";
 import { CATEGORIES, productsInCategory } from "@/lib/categories";
@@ -39,6 +41,11 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <HomeLoginCard />
+        <MonthCalendar />
+      </div>
 
       {!products && <p className="mt-6 text-sm">상품을 불러오는 중</p>}
       {error && (
