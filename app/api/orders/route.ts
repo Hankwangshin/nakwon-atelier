@@ -6,6 +6,7 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
+import { getMemberDiscount } from "@/lib/member-tiers";
 import { getProducts } from "@/lib/products";
 import { createAdminClient, createUserClient, getCurrentUser } from "@/lib/supabase";
 
@@ -21,7 +22,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "order_number, order_name, amount, status, created_at, paid_at, order_items (name, price, quantity), order_requests (type, reason, status, created_at)",
+      "order_number, order_name, amount, tier_name, discount_percent, discount_amount, status, created_at, paid_at, order_items (name, price, quantity), order_requests (type, reason, status, created_at)",
     )
     .eq("user_id", user.id)
     .in("status", ["paid", "cancelled"])
@@ -67,7 +68,11 @@ export async function POST(request: Request) {
     return serverFailedResponse();
   }
 
-  const cart = summarizeCart(rows, await getProducts());
+  const cart = summarizeCart(
+    rows,
+    await getProducts(),
+    await getMemberDiscount(user.id),
+  );
   if (!isOrderable(cart.lines)) {
     return errorResponse(
       "NOT_ORDERABLE",
@@ -86,6 +91,9 @@ export async function POST(request: Request) {
       user_id: user.id,
       order_name: orderName,
       items_amount: cart.itemsAmount,
+      tier_name: cart.discount.tierName,
+      discount_percent: cart.discount.percent,
+      discount_amount: cart.discountAmount,
       shipping_fee: cart.shippingFee,
       amount: cart.amount,
       receiver_name: receiverName.trim(),
@@ -121,6 +129,7 @@ export async function POST(request: Request) {
       orderNumber,
       orderName,
       amount: cart.amount,
+      discountAmount: cart.discountAmount,
       customerKey: user.id,
       customerEmail: user.email,
     },

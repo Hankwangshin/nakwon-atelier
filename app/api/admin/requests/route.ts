@@ -1,9 +1,9 @@
-import { denyUnlessAdmin } from "@/lib/admin";
+import { denyUnlessAllowed } from "@/lib/admin";
 import { logFailure, serverFailedResponse } from "@/lib/http";
 import { createAdminClient } from "@/lib/supabase";
 
 export async function GET() {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("requests");
   if (denied) {
     return denied;
   }

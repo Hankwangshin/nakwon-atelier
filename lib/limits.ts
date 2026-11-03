@@ -3,3 +3,5 @@
 export const MAX_QUESTION_LENGTH = 500; // PRD 7번 — 고객 문장 글자 수
 export const MAX_ASSISTANT_LENGTH = 1000; // Design Ref: §6 — 챗봇 답변 글자 수
 export const MAX_HISTORY_ITEMS = 10; // Design Ref: §6 — 현재 질문을 뺀 말풍선 수
+export const MAX_DISCOUNT_PERCENT = 50; // PRD 6번 — 회원 등급 할인율 상한
+export const MAX_TIER_NAME_LENGTH = 20;

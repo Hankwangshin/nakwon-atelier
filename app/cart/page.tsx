@@ -108,6 +108,16 @@ export default function CartPage() {
           <dl className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900">
             <dt>상품 금액</dt>
             <dd className="text-right">{formatPrice(cart.itemsAmount)}</dd>
+            {cart.discountAmount > 0 && (
+              <>
+                <dt>
+                  {cart.discount.tierName} 등급 할인 ({cart.discount.percent}%)
+                </dt>
+                <dd className="text-right text-red-600 dark:text-red-400">
+                  -{formatPrice(cart.discountAmount)}
+                </dd>
+              </>
+            )}
             <dt>배송비 (묶음 배송)</dt>
             <dd className="text-right">{formatPrice(cart.shippingFee)}</dd>
             <dt className="font-semibold">결제 금액</dt>

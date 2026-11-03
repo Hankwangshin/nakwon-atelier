@@ -11,6 +11,7 @@ interface CreatedOrder {
   orderNumber: string;
   orderName: string;
   amount: number;
+  discountAmount: number;
   customerKey: string;
   customerEmail?: string;
 }
@@ -122,6 +123,11 @@ export default function CheckoutPage() {
           <p className="mt-4">
             {order.orderName} · <span className="font-semibold">{formatPrice(order.amount)}</span>
           </p>
+          {order.discountAmount > 0 && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              등급 할인 {formatPrice(order.discountAmount)} 적용
+            </p>
+          )}
           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
             테스트 결제입니다. 실제 금액이 빠져나가지 않습니다.
           </p>

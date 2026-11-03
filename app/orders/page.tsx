@@ -18,6 +18,9 @@ interface Order {
   order_number: string;
   order_name: string;
   amount: number;
+  tier_name: string | null;
+  discount_percent: number;
+  discount_amount: number;
   status: string;
   paid_at: string;
   order_items: { name: string; price: number; quantity: number }[];
@@ -113,6 +116,11 @@ export default function OrdersPage() {
                 </li>
               ))}
             </ul>
+            {order.discount_amount > 0 && (
+              <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+                {order.tier_name} 등급 할인 ({order.discount_percent}%) -{formatPrice(order.discount_amount)}
+              </p>
+            )}
             <p className="mt-2 font-semibold">결제 금액 {formatPrice(order.amount)}</p>
 
             {order.order_requests.length > 0 && (

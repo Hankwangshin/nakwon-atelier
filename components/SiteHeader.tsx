@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ADMIN_SCOPES } from "@/lib/admin-scopes";
+import type { AdminScope } from "@/lib/admin-scopes";
 import { callApi, LOGOUT_EVENT } from "@/lib/client-api";
 
 const LINKS = [
@@ -13,27 +15,27 @@ const LINKS = [
 ];
 
 interface Me {
-  user: { name?: string; isAdmin?: boolean } | null;
+  user: { name?: string; adminScopes?: AdminScope[] } | null;
 }
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminScopes, setAdminScopes] = useState<AdminScope[]>([]);
 
   // 페이지를 옮길 때마다 로그인 상태를 다시 확인한다.
   useEffect(() => {
     callApi<Me>("/api/auth/me").then(({ data }) => {
       setIsLoggedIn(Boolean(data?.user));
-      setIsAdmin(data?.user?.isAdmin === true);
+      setAdminScopes(data?.user?.adminScopes ?? []);
     });
   }, [pathname]);
 
   async function handleLogout() {
     await callApi("/api/auth/logout", "POST");
     setIsLoggedIn(false);
-    setIsAdmin(false);
+    setAdminScopes([]);
     // 메인 페이지에서는 주소가 그대로라, 로그인 칸에 따로 알려 준다.
     window.dispatchEvent(new Event(LOGOUT_EVENT));
     router.push("/");
@@ -65,19 +67,11 @@ export default function SiteHeader() {
         <span className="ml-auto flex gap-3">
           {isLoggedIn ? (
             <>
-              {isAdmin && (
-                <>
-                  <Link href="/admin/products" className="text-zinc-600 dark:text-zinc-400">
-                    상품 관리
-                  </Link>
-                  <Link href="/admin/members" className="text-zinc-600 dark:text-zinc-400">
-                    회원 관리
-                  </Link>
-                  <Link href="/admin/requests" className="text-zinc-600 dark:text-zinc-400">
-                    요청 관리
-                  </Link>
-                </>
-              )}
+              {ADMIN_SCOPES.filter(({ id }) => adminScopes.includes(id)).map(({ href, label }) => (
+                <Link key={href} href={href} className="text-zinc-600 dark:text-zinc-400">
+                  {label}
+                </Link>
+              ))}
               <Link href="/account" className="text-zinc-600 dark:text-zinc-400">
                 내 정보
               </Link>

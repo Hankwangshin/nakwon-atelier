@@ -1,11 +1,11 @@
-import { denyUnlessAdmin } from "@/lib/admin";
+import { denyUnlessAllowed } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import { removeUploadedImage } from "@/lib/product-images";
 import { parseProductInput, toProductRow } from "@/lib/products";
 import { createAdminClient } from "@/lib/supabase";
 
 export async function PATCH(request: Request, context: RouteContext<"/api/products/[id]">) {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("products");
   if (denied) {
     return denied;
   }
@@ -45,7 +45,7 @@ export async function PATCH(request: Request, context: RouteContext<"/api/produc
 
 // 지난 주문은 주문 당시 상품명과 가격을 따로 저장해 두었으므로 그대로 남는다.
 export async function DELETE(_request: Request, context: RouteContext<"/api/products/[id]">) {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("products");
   if (denied) {
     return denied;
   }

@@ -1,6 +1,70 @@
-import { denyUnlessAdmin } from "@/lib/admin";
+import { denyUnlessAllowed } from "@/lib/admin";
+import { isAdminScope } from "@/lib/admin-scopes";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, getCurrentUser } from "@/lib/supabase";
+
+// 회원의 등급과 관리 권한 범위를 바꾼다.
+export async function PATCH(
+  request: Request,
+  context: RouteContext<"/api/admin/members/[id]">,
+) {
+  const denied = await denyUnlessAllowed("members");
+  if (denied) {
+    return denied;
+  }
+
+  const body = await request.json().catch(() => null);
+  const { tierId, adminScopes } = body ?? {};
+  if (
+    typeof tierId !== "string" ||
+    !Array.isArray(adminScopes) ||
+    !adminScopes.every(isAdminScope)
+  ) {
+    return errorResponse("INVALID_INPUT", "등급과 권한을 확인해 주세요.", 400);
+  }
+
+  const { id } = await context.params;
+  const currentUser = await getCurrentUser();
+  // 자기 할인율이나 권한을 스스로 올리지 못하게 막는다.
+  if (id === currentUser?.id) {
+    return errorResponse("SELF_CHANGE", "본인의 등급과 권한은 직접 바꿀 수 없습니다.", 403);
+  }
+
+  const admin = createAdminClient();
+  const { data: member } = await admin
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!member) {
+    return errorResponse("NOT_FOUND", "없는 회원입니다.", 404);
+  }
+  if (member.is_admin) {
+    return errorResponse("ADMIN_PROTECTED", "전체 관리자 계정은 바꿀 수 없습니다.", 409);
+  }
+
+  const { data: tier } = await admin
+    .from("membership_tiers")
+    .select("id")
+    .eq("id", tierId)
+    .maybeSingle();
+
+  if (!tier) {
+    return errorResponse("NOT_FOUND", "없는 등급입니다.", 404);
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ tier_id: tier.id, admin_scopes: [...new Set(adminScopes)] })
+    .eq("id", id);
+
+  if (error) {
+    logFailure("member update failed", error);
+    return serverFailedResponse();
+  }
+  return Response.json({ ok: true });
+}
 
 // 관리자가 회원을 탈퇴 처리한다. 회원 정보와 장바구니는 삭제하고,
 // 주문 기록은 법정 보관을 위해 회원 연결만 끊어 남긴다.
@@ -8,7 +72,7 @@ export async function DELETE(
   _request: Request,
   context: RouteContext<"/api/admin/members/[id]">,
 ) {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("members");
   if (denied) {
     return denied;
   }

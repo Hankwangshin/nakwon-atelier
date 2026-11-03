@@ -1,4 +1,5 @@
 import { getAdminUser } from "@/lib/admin";
+import { ALL_ADMIN_SCOPES } from "@/lib/admin-scopes";
 import {
   errorResponse,
   logFailure,
@@ -16,17 +17,19 @@ export async function GET() {
   const supabase = await createUserClient();
   const { data } = await supabase
     .from("profiles")
-    .select("name, phone, is_admin")
+    .select("name, phone, is_admin, admin_scopes")
     .eq("id", user.id)
     .maybeSingle();
 
+  const isAdmin = data?.is_admin === true;
   return Response.json({
     user: {
       id: user.id,
       email: user.email,
       name: data?.name,
       phone: data?.phone,
-      isAdmin: data?.is_admin === true,
+      isAdmin,
+      adminScopes: isAdmin ? ALL_ADMIN_SCOPES : (data?.admin_scopes ?? []),
     },
   });
 }

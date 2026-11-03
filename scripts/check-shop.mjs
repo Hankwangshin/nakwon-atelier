@@ -3,6 +3,7 @@
 // 실행: npm run dev를 켠 뒤 node scripts/check-shop.mjs
 import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
+import { summarizeCart } from "../lib/cart.ts";
 
 process.loadEnvFile(new URL("../.env", import.meta.url));
 const require = createRequire(import.meta.url);
@@ -65,6 +66,7 @@ const accountA = newAccount();
 const accountB = newAccount();
 const createdIds = [];
 const createdProducts = [];
+const tierName = `점검${randomBytes(3).toString("hex")}`;
 
 try {
   // 회원가입
@@ -302,6 +304,61 @@ try {
   check("회원이 직접 요청을 승인할 수 없음", unchanged.status === "pending" || Boolean(anonRequest));
   check("대기 주문에는 요청 불가", (await userA(`/api/orders/${orderNumber}/requests`, "POST", { type: "cancel", reason: "사유" })).status === 409);
 
+  // 회원 등급과 할인
+  const tierUrl = "/api/admin/tiers";
+  check("비회원 등급 조회 거절", (await guest(tierUrl)).status === 401);
+  check("일반 회원 등급 조회 거절", (await userA(tierUrl)).status === 403);
+  check("일반 회원 등급 추가 거절", (await userA(tierUrl, "POST", { name: tierName, discountPercent: 10 })).status === 403);
+  check("할인율 51% 거절", (await manager(tierUrl, "POST", { name: tierName, discountPercent: 51 })).status === 400);
+  check("소수 할인율 거절", (await manager(tierUrl, "POST", { name: tierName, discountPercent: 1.5 })).status === 400);
+  check("빈 등급 이름 거절", (await manager(tierUrl, "POST", { name: " ", discountPercent: 10 })).status === 400);
+  check("등급 추가", (await manager(tierUrl, "POST", { name: tierName, discountPercent: 10 })).status === 201);
+  check("같은 등급 이름 거절", (await manager(tierUrl, "POST", { name: tierName, discountPercent: 5 })).status === 409);
+  const tierList = (await manager(tierUrl)).body.tiers;
+  const defaultTier = tierList.find(({ isDefault }) => isDefault);
+  const newTier = tierList.find(({ name }) => name === tierName);
+  check("기본 등급 삭제 거절", (await manager(`${tierUrl}/${defaultTier.id}`, "DELETE")).status === 409);
+
+  const memberUrl = (id) => `/api/admin/members/${id}`;
+  check("일반 회원 등급 지정 거절", (await userA(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 403);
+  check("없는 권한 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: ["payments"] })).status === 400);
+  check("없는 등급 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: "00000000-0000-0000-0000-000000000000", adminScopes: [] })).status === 404);
+  check("없는 회원 거절", (await manager(memberUrl("00000000-0000-0000-0000-000000000000"), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 404);
+  check("본인 등급 변경 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 403);
+  check("할인 전 금액", (await userA("/api/cart")).body.amount === 12000);
+  check("관리자가 등급 지정", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 200);
+  const discounted = (await userA("/api/cart")).body;
+  check("할인은 상품 금액에만 적용", discounted.discountAmount === 900 && discounted.shippingFee === 3000 && discounted.amount === 11100);
+  check("1원 미만은 할인액에서 버림", summarizeCart([{ product_id: "x", quantity: 1 }], [{ id: "x", price: 999, shipping: "무료" }], { tierName: "t", percent: 15 }).discountAmount === 149);
+  const discountedOrder = await userA("/api/orders", "POST", shipping);
+  check("주문 금액에 할인 적용", discountedOrder.body.amount === 11100 && discountedOrder.body.discountAmount === 900);
+  check("할인율 수정", (await manager(`${tierUrl}/${newTier.id}`, "PATCH", { name: tierName, discountPercent: 20 })).status === 200);
+  check("수정한 할인율이 장바구니에 바로 반영", (await userA("/api/cart")).body.amount === 10200);
+  const { data: savedOrder } = await admin.from("orders").select("amount, tier_name, discount_percent, discount_amount").eq("order_number", discountedOrder.body.orderNumber).single();
+  check("지난 주문의 할인은 그대로", savedOrder.amount === 11100 && savedOrder.discount_percent === 10 && savedOrder.discount_amount === 900 && savedOrder.tier_name === tierName);
+  const { data: tierRows } = await anon.from("membership_tiers").select("*");
+  check("공개 키로 등급을 볼 수 없음", (tierRows ?? []).length === 0);
+  await signedIn.from("profiles").update({ tier_id: newTier.id, admin_scopes: ["members"] }).eq("id", meB.id);
+  const { data: selfRaised } = await admin.from("profiles").select("tier_id, admin_scopes").eq("id", meB.id).single();
+  check("회원이 스스로 등급과 권한을 올릴 수 없음", selfRaised.tier_id === null && selfRaised.admin_scopes.length === 0);
+  check("등급 삭제", (await manager(`${tierUrl}/${newTier.id}`, "DELETE")).status === 200);
+  check("등급을 지우면 기본 등급으로 계산", (await userA("/api/cart")).body.amount === 12000);
+
+  // 관리 권한 범위
+  check("상품 권한 부여", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["products"] })).status === 200);
+  check("권한이 내 정보에 표시", (await userA("/api/auth/me")).body.user.adminScopes.join() === "products");
+  check("상품 권한으로 상품 관리 가능", (await userA("/api/admin/products")).status === 200);
+  check("상품 권한으로 회원 관리 거절", (await userA("/api/admin/members")).status === 403);
+  check("상품 권한으로 요청 관리 거절", (await userA("/api/admin/requests")).status === 403);
+  check("회원 권한 부여", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["members"] })).status === 200);
+  check("회원 권한으로 회원 관리 가능", (await userA("/api/admin/members")).status === 200);
+  check("회원 권한으로 상품 관리 거절", (await userA("/api/admin/products")).status === 403);
+  check("본인 권한은 스스로 늘릴 수 없음", (await userA(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["members", "products"] })).status === 403);
+  check("전체 관리자 계정은 바꿀 수 없음", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 409);
+  check("권한 회수", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 200);
+  check("회수 후 바로 거절", (await userA("/api/admin/members")).status === 403);
+  check("전체 관리자는 모든 권한", (await manager("/api/auth/me")).body.user.adminScopes.length === 3);
+
   // 회원 관리
   check("비회원 회원 목록 거절", (await guest("/api/admin/members")).status === 401);
   check("일반 회원 회원 목록 거절", (await userB("/api/admin/members")).status === 403);
@@ -338,6 +395,7 @@ try {
   for (const id of createdProducts) {
     await admin.from("products").delete().eq("id", id);
   }
+  await admin.from("membership_tiers").delete().eq("name", tierName);
   await admin.from("orders").delete().like("receiver_name", "시험 회원");
   for (const id of createdIds) {
     await admin.auth.admin.deleteUser(id).catch(() => null);

@@ -5,6 +5,7 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
+import { getMemberDiscount } from "@/lib/member-tiers";
 import { getProducts } from "@/lib/products";
 import type { Product } from "@/lib/types";
 import { createUserClient, getCurrentUser } from "@/lib/supabase";
@@ -21,7 +22,9 @@ async function readCart(userId: string) {
     logFailure("cart read failed", error);
     return serverFailedResponse();
   }
-  return Response.json(summarizeCart(data, await getProducts()));
+  return Response.json(
+    summarizeCart(data, await getProducts(), await getMemberDiscount(userId)),
+  );
 }
 
 function findQuantityProblem(

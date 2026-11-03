@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { denyUnlessAdmin } from "@/lib/admin";
+import { denyUnlessAllowed } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import {
   IMAGE_BUCKET,
@@ -11,7 +11,7 @@ import { createAdminClient } from "@/lib/supabase";
 
 // 관리자의 상품 사진 올리기. JPG, PNG, WEBP만 받는다.
 export async function POST(request: Request) {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("products");
   if (denied) {
     return denied;
   }
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
 // 저장하지 않고 취소한 사진을 지운다.
 export async function DELETE(request: Request) {
-  const denied = await denyUnlessAdmin();
+  const denied = await denyUnlessAllowed("products");
   if (denied) {
     return denied;
   }
