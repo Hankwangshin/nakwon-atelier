@@ -23,6 +23,8 @@ export default function LoginForm() {
     setIsSending(false);
 
     if (result.ok) {
+      // 로그인 화면은 숨겨진 채 남으므로, 다음에 열었을 때 비밀번호가 남아 있지 않게 비운다.
+      setPassword("");
       router.push("/products");
     } else {
       setError(result.errorMessage);

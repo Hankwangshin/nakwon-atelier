@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import LoginForm from "@/components/LoginForm";
-import { callApi, LOGOUT_EVENT } from "@/lib/client-api";
+import { callApi } from "@/lib/client-api";
 
 interface Me {
   user: { name?: string } | null;
@@ -14,15 +14,10 @@ export default function HomeLoginCard() {
   const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
+    // 숨겨졌다 다시 보일 때마다 다시 확인해, 다른 화면에서 로그인했어도 맞게 보인다.
     callApi<Me>("/api/auth/me").then(({ data }) => {
       setMe(data ?? { user: null });
     });
-
-    function handleLogout() {
-      setMe({ user: null });
-    }
-    window.addEventListener(LOGOUT_EVENT, handleLogout);
-    return () => window.removeEventListener(LOGOUT_EVENT, handleLogout);
   }, []);
 
   return (

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ADMIN_SCOPES } from "@/lib/admin-scopes";
 import type { AdminScope } from "@/lib/admin-scopes";
-import { callApi, LOGOUT_EVENT } from "@/lib/client-api";
+import NavLink from "@/components/NavLink";
+import { callApi } from "@/lib/client-api";
 
 const LINKS = [
   { href: "/products", label: "상품" },
@@ -20,25 +21,31 @@ interface Me {
 
 export default function SiteHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [adminScopes, setAdminScopes] = useState<AdminScope[]>([]);
 
   // 페이지를 옮길 때마다 로그인 상태를 다시 확인한다.
+  // 빠르게 여러 번 옮기면 늦게 온 예전 답이 새 답을 덮지 않도록 마지막 확인만 반영한다.
   useEffect(() => {
+    let isLatest = true;
     callApi<Me>("/api/auth/me").then(({ data }) => {
+      if (!isLatest) {
+        return;
+      }
       setIsLoggedIn(Boolean(data?.user));
       setAdminScopes(data?.user?.adminScopes ?? []);
     });
+    return () => {
+      isLatest = false;
+    };
   }, [pathname]);
 
   async function handleLogout() {
     await callApi("/api/auth/logout", "POST");
-    setIsLoggedIn(false);
-    setAdminScopes([]);
-    // 메인 페이지에서는 주소가 그대로라, 로그인 칸에 따로 알려 준다.
-    window.dispatchEvent(new Event(LOGOUT_EVENT));
-    router.push("/");
+    // 이 Next.js는 떠난 화면을 숨겨 두고 다시 보여 주므로, 페이지를 새로 불러
+    // 앞 사람의 장바구니·입력값 같은 화면 내용이 남지 않게 모두 비운다.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 일부러 새로 불러온다(Next 문서 권장 방식)
+    window.location.href = "/";
   }
 
   return (
@@ -51,30 +58,19 @@ export default function SiteHeader() {
           낙원 아뜰리에
         </Link>
         {LINKS.map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={pathname === href ? "page" : undefined}
-            className={
-              pathname === href
-                ? "font-medium text-blue-600 dark:text-blue-400"
-                : "text-zinc-600 dark:text-zinc-400"
-            }
-          >
+          <NavLink key={href} href={href}>
             {label}
-          </Link>
+          </NavLink>
         ))}
         <span className="ml-auto flex gap-3">
           {isLoggedIn ? (
             <>
               {ADMIN_SCOPES.filter(({ id }) => adminScopes.includes(id)).map(({ href, label }) => (
-                <Link key={href} href={href} className="text-zinc-600 dark:text-zinc-400">
+                <NavLink key={href} href={href}>
                   {label}
-                </Link>
+                </NavLink>
               ))}
-              <Link href="/account" className="text-zinc-600 dark:text-zinc-400">
-                내 정보
-              </Link>
+              <NavLink href="/account">내 정보</NavLink>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -85,12 +81,8 @@ export default function SiteHeader() {
             </>
           ) : (
             <>
-              <Link href="/login" className="text-zinc-600 dark:text-zinc-400">
-                로그인
-              </Link>
-              <Link href="/signup" className="text-zinc-600 dark:text-zinc-400">
-                회원가입
-              </Link>
+              <NavLink href="/login">로그인</NavLink>
+              <NavLink href="/signup">회원가입</NavLink>
             </>
           )}
         </span>
