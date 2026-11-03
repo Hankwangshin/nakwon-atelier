@@ -33,6 +33,17 @@ export function createAdminClient() {
   );
 }
 
+// 지금 로그인 상태(쿠키)를 건드리지 않도록 따로 연결해서 비밀번호만 확인한다.
+export async function isPasswordCorrect(email: string, password: string) {
+  const client = createClient(
+    process.env.SUPABASE_URL as string,
+    process.env.SUPABASE_ANON_KEY as string,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  return !error;
+}
+
 export async function getCurrentUser() {
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();

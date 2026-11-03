@@ -379,6 +379,22 @@ try {
   const { data: bCart } = await admin.from("cart_items").select("product_id").eq("user_id", meB.id);
   check("탈퇴 처리 시 회원 정보와 장바구니 삭제", bProfile.length === 0 && bCart.length === 0);
 
+  // 내 정보 수정
+  const profileEdit = { name: "바뀐 이름", phone: "010-1111-2222", password: accountA.password };
+  const readProfile = async () => (await admin.from("profiles").select("name, phone").eq("id", me.id).single()).data;
+  check("비회원 내 정보 수정 거절", (await guest("/api/auth/me", "PATCH", profileEdit)).status === 401);
+  check("비밀번호 없으면 수정 거절", (await userA("/api/auth/me", "PATCH", { ...profileEdit, password: undefined })).status === 400);
+  check("틀린 비밀번호면 수정 거절", (await userA("/api/auth/me", "PATCH", { ...profileEdit, password: "wrong-password" })).body?.error?.code === "WRONG_PASSWORD");
+  check("틀린 비밀번호면 저장 안 됨", (await readProfile()).name === "시험 회원");
+  check("휴대폰 번호 형식 거절", (await userA("/api/auth/me", "PATCH", { ...profileEdit, phone: "1234" })).status === 400);
+  check("빈 이름 거절", (await userA("/api/auth/me", "PATCH", { ...profileEdit, name: " " })).status === 400);
+  check("비밀번호가 맞으면 수정", (await userA("/api/auth/me", "PATCH", { ...profileEdit, email: "changed@example.com", isAdmin: true })).status === 200);
+  const edited = (await userA("/api/auth/me")).body.user;
+  check("수정해도 로그인 유지, 이름과 번호 반영", edited?.name === "바뀐 이름" && edited.phone === "010-1111-2222");
+  check("이메일과 권한은 함께 바뀌지 않음", edited.email === accountA.email && edited.isAdmin === false);
+  await signedIn.from("profiles").update({ name: "직접 수정" }).eq("id", meB.id);
+  check("공개 키로 회원 정보를 직접 고칠 수 없음", (await readProfile()).name === "바뀐 이름");
+
   // 탈퇴
   await userA("/api/auth/logout", "POST");
   check("로그아웃 후 정보 없음", (await userA("/api/auth/me")).body.user === null);

@@ -2,15 +2,92 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import TextField from "@/components/TextField";
 import { callApi } from "@/lib/client-api";
 
+interface User {
+  email?: string;
+  name?: string;
+  phone?: string;
+}
+
 interface Me {
-  user: { email?: string; name?: string; phone?: string } | null;
+  user: User | null;
+}
+
+interface AccountEditFormProps {
+  user: User;
+  onSaved: (name: string, phone: string) => void;
+  onCancel: () => void;
+}
+
+// 수정 버튼을 누르면 비밀번호를 묻고, 서버가 맞다고 확인해야 저장된다.
+function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
+  const [name, setName] = useState(user.name ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [password, setPassword] = useState("");
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isConfirming) {
+      setIsConfirming(true);
+      return;
+    }
+
+    setError("");
+    setIsSending(true);
+    const result = await callApi("/api/auth/me", "PATCH", { name, phone, password });
+    setIsSending(false);
+    setPassword("");
+
+    if (result.ok) {
+      onSaved(name.trim(), phone);
+    } else {
+      setError(result.errorMessage);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+      <p>이메일 {user.email} (바꿀 수 없습니다)</p>
+      <TextField label="이름" value={name} onChange={setName} autoComplete="name" />
+      <TextField label="휴대폰 번호" type="tel" value={phone} onChange={setPhone} autoComplete="tel" placeholder="010-0000-0000" />
+      {isConfirming && (
+        <TextField label="비밀번호를 한 번 더 입력해 주세요" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+      )}
+      {error && (
+        <p role="alert" className="text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isSending}
+          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-50"
+        >
+          {isConfirming ? "비밀번호 확인 후 저장" : "수정"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-zinc-300 px-4 py-2 dark:border-zinc-700"
+        >
+          취소
+        </button>
+      </div>
+    </form>
+  );
 }
 
 export default function AccountPage() {
   const router = useRouter();
-  const [user, setUser] = useState<Me["user"]>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -42,7 +119,18 @@ export default function AccountPage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6 text-sm">
       <h1 className="text-xl font-semibold">내 정보</h1>
-      {user && (
+      {user && isEditing && (
+        <AccountEditForm
+          user={user}
+          onSaved={(name, phone) => {
+            setUser({ ...user, name, phone });
+            setIsEditing(false);
+            setMessage("내 정보를 수정했습니다.");
+          }}
+          onCancel={() => setIsEditing(false)}
+        />
+      )}
+      {user && !isEditing && (
         <dl className="mt-4 grid grid-cols-[6rem_1fr] gap-1">
           <dt className="text-zinc-600 dark:text-zinc-400">이메일</dt>
           <dd>{user.email}</dd>
@@ -51,6 +139,23 @@ export default function AccountPage() {
           <dt className="text-zinc-600 dark:text-zinc-400">휴대폰 번호</dt>
           <dd>{user.phone}</dd>
         </dl>
+      )}
+      {user && !isEditing && (
+        <button
+          type="button"
+          onClick={() => {
+            setMessage("");
+            setIsEditing(true);
+          }}
+          className="mt-4 rounded-lg border border-zinc-300 px-3 py-1 dark:border-zinc-700"
+        >
+          정보 수정
+        </button>
+      )}
+      {message && (
+        <p role="status" className="mt-3 text-green-700 dark:text-green-400">
+          {message}
+        </p>
       )}
       <p className="mt-6 text-zinc-600 dark:text-zinc-400">
         개인정보 열람, 정정, 삭제, 처리 정지 요청은 help@example.com으로 문의해 주세요.

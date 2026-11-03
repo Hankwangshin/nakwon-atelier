@@ -1,8 +1,8 @@
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
+import { findProfileProblem } from "@/lib/member-input";
 import { createAdminClient, createUserClient } from "@/lib/supabase";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_PATTERN = /^01\d-?\d{3,4}-?\d{4}$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 function findInputProblem(body: Record<string, unknown>): string | null {
@@ -14,11 +14,9 @@ function findInputProblem(body: Record<string, unknown>): string | null {
   if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
     return `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상 입력해 주세요.`;
   }
-  if (typeof name !== "string" || name.trim() === "") {
-    return "이름을 입력해 주세요.";
-  }
-  if (typeof phone !== "string" || !PHONE_PATTERN.test(phone)) {
-    return "휴대폰 번호 형식을 확인해 주세요.";
+  const profileProblem = findProfileProblem(name, phone);
+  if (profileProblem) {
+    return profileProblem;
   }
   if (isOver14 !== true) {
     return "만 14세 이상만 가입할 수 있습니다.";
