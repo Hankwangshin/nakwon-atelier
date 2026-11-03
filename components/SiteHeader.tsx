@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ADMIN_MENUS } from "@/lib/admin-menus";
 import NavLink from "@/components/NavLink";
-import { callApi } from "@/lib/client-api";
+import { callApi, logout } from "@/lib/client-api";
 
 const LINKS = [
   { href: "/products", label: "상품" },
@@ -39,14 +39,6 @@ export default function SiteHeader() {
     };
   }, [pathname]);
 
-  async function handleLogout() {
-    await callApi("/api/auth/logout", "POST");
-    // 이 Next.js는 떠난 화면을 숨겨 두고 다시 보여 주므로, 페이지를 새로 불러
-    // 앞 사람의 장바구니·입력값 같은 화면 내용이 남지 않게 모두 비운다.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 일부러 새로 불러온다(Next 문서 권장 방식)
-    window.location.href = "/";
-  }
-
   return (
     <header className="shrink-0 border-b border-zinc-200 dark:border-zinc-800">
       <p className="bg-amber-100 px-4 py-1 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -73,7 +65,7 @@ export default function SiteHeader() {
               <NavLink href="/account">내 정보</NavLink>
               <button
                 type="button"
-                onClick={handleLogout}
+                onClick={logout}
                 className="text-zinc-600 dark:text-zinc-400"
               >
                 로그아웃
