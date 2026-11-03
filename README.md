@@ -6,7 +6,7 @@
 
 > 실습용 샘플 쇼핑몰입니다. 실제 개인정보를 입력하지 마세요. 결제는 토스페이먼츠 **테스트 환경**으로만 진행되며 실제 금액이 빠져나가지 않습니다.
 
-- 배포 주소: (배포 후 추가)
+- 배포 주소: https://nakwon-atelier.vercel.app
 - 기획 문서: [PRD.md](PRD.md) (기능·범위·AI 규칙의 기준) · [PLAN.md](PLAN.md) (작업 순서와 진행 상태) · [DESIGN.md](DESIGN.md) (설계)
 - 테스트 결과: [test-results.md](test-results.md)
 
