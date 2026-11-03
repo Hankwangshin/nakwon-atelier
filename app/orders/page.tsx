@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import ReorderButton from "@/components/ReorderButton";
 import { callApi, formatPrice } from "@/lib/client-api";
 import type { ApiResult } from "@/lib/client-api";
 import { REQUEST_STATUS_LABELS, REQUEST_TYPE_LABELS } from "@/lib/order-requests";
@@ -122,6 +123,9 @@ export default function OrdersPage() {
               </p>
             )}
             <p className="mt-2 font-semibold">결제 금액 {formatPrice(order.amount)}</p>
+            <div className="mt-2">
+              <ReorderButton orderNumber={order.order_number} />
+            </div>
 
             {order.order_requests.length > 0 && (
               <ul className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">

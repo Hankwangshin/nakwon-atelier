@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AddressFields from "@/components/AddressFields";
+import RecentOrders from "@/components/RecentOrders";
 import TextField from "@/components/TextField";
 import { callApi } from "@/lib/client-api";
 import { MIN_PASSWORD_LENGTH } from "@/lib/member-input";
@@ -234,6 +235,7 @@ export default function AccountPage() {
           {message}
         </p>
       )}
+      {user && <RecentOrders />}
       <p className="mt-6 text-zinc-600 dark:text-zinc-400">
         개인정보 열람, 정정, 삭제, 처리 정지 요청은 help@example.com으로 문의해 주세요.
       </p>

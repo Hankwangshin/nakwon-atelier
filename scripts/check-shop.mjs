@@ -298,6 +298,46 @@ try {
   const reopened = (await readRequests()).find(({ status }) => status === "pending");
   const failedCancel = await decide(manager, reopened.id, "approve");
   check("결제대행사가 거절하면 취소 실패", failedCancel.body?.error?.code === "CANCEL_FAILED");
+
+  // 재구매: 지난 주문의 상품을 장바구니에 다시 담는다.
+  const listedProducts = (await guest("/api/products")).body.products;
+  const onSale = listedProducts.filter(({ stock }) => stock > 0).sort((a, b) => a.stock - b.stock);
+  const [fewStock, plenty] = [onSale[0], onSale[onSale.length - 1]];
+  const soldOutProduct = listedProducts.find(({ stock }) => stock === 0);
+  const reorderNumber = await makePaidOrder(meB.id, "fake-reorder-key");
+  const { data: reorderRow } = await admin.from("orders").select("id").eq("order_number", reorderNumber).single();
+  await admin.from("order_items").insert([
+    { order_id: reorderRow.id, product_id: plenty.id, name: plenty.name, price: plenty.price, quantity: 1 },
+    { order_id: reorderRow.id, product_id: fewStock.id, name: fewStock.name, price: fewStock.price, quantity: fewStock.stock + 5 },
+    { order_id: reorderRow.id, product_id: "gone-product", name: "판매 끝난 상품", price: 1000, quantity: 1 },
+    ...(soldOutProduct ? [{ order_id: reorderRow.id, product_id: soldOutProduct.id, name: soldOutProduct.name, price: soldOutProduct.price, quantity: 1 }] : []),
+  ]);
+  const reorderUrl = `/api/orders/${reorderNumber}/reorder`;
+  for (const { productId } of (await userB("/api/cart")).body.lines) {
+    await userB("/api/cart", "DELETE", { productId });
+  }
+  check("비회원 재구매 거절", (await guest(reorderUrl, "POST")).status === 401);
+  check("다른 회원 주문은 재구매 불가", (await manager(reorderUrl, "POST")).status === 404);
+  check("없는 주문 재구매 404", (await userB("/api/orders/nope/reorder", "POST")).status === 404);
+  const reordered = await userB(reorderUrl, "POST");
+  const reorderedCart = (await userB("/api/cart")).body.lines;
+  const qtyOf = (id) => reorderedCart.find(({ productId }) => productId === id)?.quantity;
+  check("재구매로 같은 수량을 담음", reordered.status === 200 && qtyOf(plenty.id) === 1);
+  check("재고보다 많으면 재고만큼 줄여 담고 알림", qtyOf(fewStock.id) === Math.min(fewStock.stock, 99) && reordered.body.added.some(({ isReduced }) => isReduced));
+  check("판매 끝난 상품은 빼고 알림", reordered.body.skipped.some(({ name }) => name === "판매 끝난 상품") && reorderedCart.length === 2);
+  if (soldOutProduct) {
+    check("품절 상품은 빼고 알림", reordered.body.skipped.some(({ reason }) => reason === "품절"));
+  }
+  const again = await userB(reorderUrl, "POST");
+  check("다시 재구매하면 수량이 더해짐", (await userB("/api/cart")).body.lines.find(({ productId }) => productId === plenty.id)?.quantity === 2);
+  check("이미 재고만큼 담긴 상품은 건너뜀", again.body.skipped.some(({ name }) => name === fewStock.name));
+  const failedNumber = await makePaidOrder(meB.id, "fake-failed-key");
+  await admin.from("orders").update({ status: "failed" }).eq("order_number", failedNumber);
+  check("실패한 주문은 재구매 불가", (await userB(`/api/orders/${failedNumber}/reorder`, "POST")).status === 404);
+  for (const { productId } of (await userB("/api/cart")).body.lines) {
+    await userB("/api/cart", "DELETE", { productId });
+  }
+
   const { data: stillPaid } = await admin.from("orders").select("status").eq("order_number", paid).single();
   check("취소 실패 시 주문은 결제 완료 유지", stillPaid.status === "paid");
   check("취소 실패 시 요청은 대기로 복구", (await readRequests()).some(({ id, status }) => id === reopened.id && status === "pending"));
