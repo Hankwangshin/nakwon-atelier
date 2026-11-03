@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import AddressFields from "@/components/AddressFields";
 import TextField from "@/components/TextField";
 import { callApi } from "@/lib/client-api";
+import { MIN_PASSWORD_LENGTH } from "@/lib/member-input";
 
 interface User {
   email?: string;
@@ -22,11 +23,12 @@ interface Me {
 
 interface AccountEditFormProps {
   user: User;
-  onSaved: (saved: EditableUser) => void;
+  onSaved: (saved: EditableUser, isPasswordChanged: boolean) => void;
   onCancel: () => void;
 }
 
 // 수정 버튼을 누르면 비밀번호를 묻고, 서버가 맞다고 확인해야 저장된다.
+// 새 비밀번호 칸은 비밀번호를 바꿀 때만 채운다. 비워 두면 비밀번호는 그대로다.
 function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
   const [name, setName] = useState(user.name ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
@@ -36,18 +38,30 @@ function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
     (user.shippingAddress ?? "") === (user.address ?? ""),
   );
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError("");
+    const isChangingPassword = newPassword !== "" || newPasswordConfirm !== "";
+    // 정보만 저장되고 비밀번호는 실패하는 일이 없도록, 보내기 전에 먼저 확인한다.
+    if (isChangingPassword && newPassword.length < MIN_PASSWORD_LENGTH) {
+      setError(`새 비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상 입력해 주세요.`);
+      return;
+    }
+    if (isChangingPassword && newPassword !== newPasswordConfirm) {
+      setError("새 비밀번호와 확인이 서로 다릅니다.");
+      return;
+    }
     if (!isConfirming) {
       setIsConfirming(true);
       return;
     }
 
-    setError("");
     setIsSending(true);
     const saved = {
       name: name.trim(),
@@ -56,14 +70,33 @@ function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
       shippingAddress: (isSameAsAddress ? address : shippingAddress).trim(),
     };
     const result = await callApi("/api/auth/me", "PATCH", { ...saved, password });
+    if (!result.ok) {
+      setIsSending(false);
+      setPassword("");
+      setError(result.errorMessage);
+      return;
+    }
+
+    // 정보를 먼저 저장한 뒤 비밀번호를 바꾼다. 거꾸로 하면 지금 비밀번호가 바뀌어 정보 저장 확인이 실패한다.
+    if (isChangingPassword) {
+      const passwordResult = await callApi("/api/auth/password", "POST", {
+        currentPassword: password,
+        newPassword,
+        newPasswordConfirm,
+      });
+      if (!passwordResult.ok) {
+        setIsSending(false);
+        setPassword("");
+        setError(`정보는 저장했지만 비밀번호는 바꾸지 못했습니다. ${passwordResult.errorMessage}`);
+        return;
+      }
+    }
+
     setIsSending(false);
     setPassword("");
-
-    if (result.ok) {
-      onSaved(saved);
-    } else {
-      setError(result.errorMessage);
-    }
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    onSaved(saved, isChangingPassword);
   }
 
   return (
@@ -79,8 +112,13 @@ function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
         isSameAsAddress={isSameAsAddress}
         onSameAsAddressChange={setIsSameAsAddress}
       />
+      <fieldset className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700">
+        <legend className="px-1">비밀번호 변경 (바꿀 때만 입력)</legend>
+        <TextField label={`새 비밀번호 (${MIN_PASSWORD_LENGTH}자 이상)`} type="password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" isRequired={false} />
+        <TextField label="새 비밀번호 확인" type="password" value={newPasswordConfirm} onChange={setNewPasswordConfirm} autoComplete="new-password" isRequired={false} />
+      </fieldset>
       {isConfirming && (
-        <TextField label="비밀번호를 한 번 더 입력해 주세요" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+        <TextField label="지금 비밀번호를 한 번 더 입력해 주세요" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
       )}
       {error && (
         <p role="alert" className="text-red-600 dark:text-red-400">
@@ -146,10 +184,14 @@ export default function AccountPage() {
       {user && isEditing && (
         <AccountEditForm
           user={user}
-          onSaved={(saved) => {
+          onSaved={(saved, isPasswordChanged) => {
             setUser({ ...user, ...saved });
             setIsEditing(false);
-            setMessage("내 정보를 수정했습니다.");
+            setMessage(
+              isPasswordChanged
+                ? "내 정보와 비밀번호를 수정했습니다. 다른 기기의 로그인은 끊어졌습니다."
+                : "내 정보를 수정했습니다.",
+            );
           }}
           onCancel={() => setIsEditing(false)}
         />
@@ -158,6 +200,8 @@ export default function AccountPage() {
         <dl className="mt-4 grid grid-cols-[6rem_1fr] gap-1">
           <dt className="text-zinc-600 dark:text-zinc-400">이메일</dt>
           <dd>{user.email}</dd>
+          <dt className="text-zinc-600 dark:text-zinc-400">비밀번호</dt>
+          <dd>******** (정보 수정에서 바꿀 수 있습니다)</dd>
           <dt className="text-zinc-600 dark:text-zinc-400">이름</dt>
           <dd>{user.name}</dd>
           <dt className="text-zinc-600 dark:text-zinc-400">휴대폰 번호</dt>
