@@ -126,7 +126,7 @@ export default function AccountPage() {
 
   async function handleWithdraw() {
     const isConfirmed = window.confirm(
-      "탈퇴하면 회원 정보와 장바구니가 삭제됩니다. 주문 기록은 법에 따라 보관됩니다. 탈퇴할까요?",
+      "탈퇴하면 이메일과 탈퇴 날짜만 남기고 회원 정보와 장바구니가 삭제되며, 다시 로그인할 수 없습니다. 주문 기록은 법에 따라 보관됩니다. 탈퇴할까요?",
     );
     if (!isConfirmed) {
       return;

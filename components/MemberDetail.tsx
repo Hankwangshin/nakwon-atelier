@@ -5,6 +5,8 @@ import type { Tier } from "@/components/TierManager";
 import { ADMIN_SCOPES } from "@/lib/admin-scopes";
 import type { AdminScope } from "@/lib/admin-scopes";
 import { MAX_ADDRESS_LENGTH } from "@/lib/limits";
+import { CHANGEABLE_STATUSES, roleLabel, roleOf } from "@/lib/member-status";
+import type { MemberStatus } from "@/lib/member-status";
 
 export interface Member {
   id: string;
@@ -14,6 +16,8 @@ export interface Member {
   address: string;
   shippingAddress: string;
   isAdmin: boolean;
+  status: MemberStatus;
+  withdrawnAt: string | null;
   isSelf: boolean;
   tierId: string | null;
   adminScopes: AdminScope[];
@@ -25,6 +29,7 @@ export interface MemberChanges {
   phone: string;
   address: string;
   shippingAddress: string;
+  status: MemberStatus;
   tierId: string;
   adminScopes: AdminScope[];
 }
@@ -77,15 +82,27 @@ export default function MemberDetail({
     phone: member.phone,
     address: member.address,
     shippingAddress: member.shippingAddress,
+    status: member.status,
     tierId,
     adminScopes: member.adminScopes,
   };
   const [form, setForm] = useState<MemberChanges>(saved);
   const [isEditing, setIsEditing] = useState(false);
-  // 전체 관리자와 본인 계정은 서버에서도 막으므로 화면에서도 고칠 수 없게 둔다.
-  const isLocked = member.isAdmin || member.isSelf;
+  const role = roleOf(member);
+  const isWithdrawn = member.status === "withdrawn";
+  // 시스템관리자, 본인, 탈퇴회원은 서버에서도 막으므로 화면에서도 고칠 수 없게 둔다.
+  const isLocked = member.isAdmin || member.isSelf || isWithdrawn;
+  const lockReason = member.isAdmin
+    ? "시스템관리자 계정은 바꿀 수 없습니다."
+    : isWithdrawn
+      ? "탈퇴한 회원은 이메일과 탈퇴 날짜만 남아 있으며 바꿀 수 없습니다."
+      : "본인 계정은 여기서 바꿀 수 없습니다. 이름과 연락처는 내 정보 메뉴에서 고칠 수 있습니다.";
 
+  // 등급은 일반회원에게만 있다.
   const tierLabel = (id: string) => {
+    if (role !== "active") {
+      return "-";
+    }
     const tier = tiers.find((item) => item.id === id);
     return tier ? `${tier.name} (${tier.discountPercent}%)` : "-";
   };
@@ -126,24 +143,19 @@ export default function MemberDetail({
     >
       <h2 id="member-detail-title" className="font-semibold">
         회원 상세 정보 · {member.name}
-        {member.isAdmin && (
-          <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">전체 관리자</span>
-        )}
         {isEditing && <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">수정 중</span>}
       </h2>
-      {isLocked && (
-        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-          {member.isAdmin
-            ? "전체 관리자 계정은 바꿀 수 없습니다."
-            : "본인 계정은 여기서 바꿀 수 없습니다. 이름과 연락처는 내 정보 메뉴에서 고칠 수 있습니다."}
-        </p>
-      )}
+      {isLocked && <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{lockReason}</p>}
 
       {!isEditing ? (
         <>
           <dl className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <Field label="아이디 (로그인 이메일)" value={member.email} />
             <Field label="가입일" value={formatJoinedAt(member.joinedAt)} />
+            <Field label="회원 구분" value={roleLabel(role)} />
+            {member.withdrawnAt && (
+              <Field label="탈퇴일" value={formatJoinedAt(member.withdrawnAt)} />
+            )}
             <Field label="성명" value={member.name} />
             <Field label="휴대폰" value={member.phone} />
             <Field label="등급" value={tierLabel(tierId)} />
@@ -205,9 +217,26 @@ export default function MemberDetail({
               />
             </label>
             <label className="flex flex-col gap-1">
-              등급
+              회원 구분
+              <select
+                value={form.status}
+                onChange={(event) =>
+                  setForm({ ...form, status: event.target.value as MemberStatus })
+                }
+                className={INPUT_CLASS}
+              >
+                {CHANGEABLE_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {roleLabel(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              {form.status === "active" ? "등급" : "등급 (일반회원만 지정)"}
               <select
                 value={form.tierId}
+                disabled={form.status !== "active"}
                 onChange={(event) => setForm({ ...form, tierId: event.target.value })}
                 className={INPUT_CLASS}
               >

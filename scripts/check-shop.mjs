@@ -403,19 +403,52 @@ try {
   check("관리자가 회원 정보 수정", (await manager(memberUrl(me.id), "PATCH", memberEdit)).status === 200);
   const editedByAdmin = (await manager("/api/admin/members?field=name&q=관리자가 고친")).body.members.find(({ id }) => id === me.id);
   check("수정한 값이 목록에 반영, 빈 배송지는 비움", editedByAdmin?.phone === "010-3333-4444" && editedByAdmin.address === "고친 주소지" && editedByAdmin.shippingAddress === "");
-  check("본인(전체 관리자) 정보 수정 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", memberEdit)).status === 403);
+  check("본인(시스템관리자) 정보 수정 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", memberEdit)).status === 403);
   await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: "시험 회원" });
   const adminMember = memberList.body.members.find(({ id }) => id === tempAdmin.user.id);
   check("관리자 계정은 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
   check("관리자 계정은 스스로 탈퇴 불가", (await manager("/api/auth/me", "DELETE")).status === 409);
   check("없는 회원 탈퇴 처리는 404", (await manager("/api/admin/members/00000000-0000-0000-0000-000000000000", "DELETE")).status === 404);
   await userB("/api/cart", "POST", { productId: "p01", quantity: 1 });
+
+  // 회원 구분: 휴면
+  const listRole = async (role) => (await manager(`/api/admin/members?${new URLSearchParams({ field: "all", q: "", role })}`)).body?.members?.map(({ id }) => id) ?? [];
+  check("시스템관리자 구분 필터", (await listRole("admin")).includes(tempAdmin.user.id) && !(await listRole("active")).includes(tempAdmin.user.id));
+  check("없는 구분 거절", (await manager("/api/admin/members?role=vip")).status === 400);
+  check("휴면으로 바꾸며 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { status: "dormant", tierId: defaultTier.id, adminScopes: [] })).body?.error?.code === "TIER_ACTIVE_ONLY");
+  check("구분을 탈퇴로 바꾸기 거절(탈퇴 처리로만)", (await manager(memberUrl(meB.id), "PATCH", { status: "withdrawn", adminScopes: [] })).status === 400);
+  check("시스템관리자를 휴면으로 바꾸기 거절", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { status: "dormant", adminScopes: [] })).status === 403);
+  check("관리자가 휴면으로 바꿈", (await manager(memberUrl(meB.id), "PATCH", { status: "dormant", adminScopes: [] })).status === 200);
+  check("휴면 구분 필터", (await listRole("dormant")).includes(meB.id) && !(await listRole("active")).includes(meB.id));
+  check("휴면회원은 로그인 쿠키가 있어도 로그아웃 상태", (await userB("/api/auth/me")).body.user === null);
+  check("휴면회원 장바구니 서버 요청 거절", (await userB("/api/cart")).status === 401);
+  const { data: dormantCart } = await signedIn.from("cart_items").select("product_id");
+  check("휴면회원은 공개 키로도 자기 장바구니를 못 봄", (dormantCart ?? []).length === 0);
+  const dormantLogin = await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password });
+  check("휴면회원 로그인 거절과 이유 안내", dormantLogin.status === 403 && dormantLogin.body?.error?.code === "DORMANT");
+  check("휴면회원 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 409);
+  check("일반회원으로 되돌림", (await manager(memberUrl(meB.id), "PATCH", { status: "active", adminScopes: [] })).status === 200);
+  check("되돌리면 다시 로그인", (await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password })).status === 200);
+  check("되돌리면 기존 로그인도 다시 사용", (await userB("/api/auth/me")).body.user?.id === meB.id);
+  // 등급 할인은 일반회원만
+  const vvip = tierList.find(({ name }) => name === "VVIP") ?? newTier;
+  await admin.from("profiles").update({ tier_id: vvip?.id ?? null }).eq("id", tempAdmin.user.id);
+  await manager("/api/cart", "POST", { productId: "p01", quantity: 1 });
+  check("시스템관리자는 등급이 있어도 할인 0원", (await manager("/api/cart")).body?.discountAmount === 0);
+
   check("관리자가 회원 탈퇴 처리", (await manager(`/api/admin/members/${meB.id}`, "DELETE")).status === 200);
   check("탈퇴 처리된 회원은 바로 로그아웃 상태", (await userB("/api/auth/me")).body.user === null);
-  check("탈퇴 처리된 회원은 로그인 불가", (await guest("/api/auth/login", "POST", { email: accountB.email, password: accountB.password })).status === 401);
-  const { data: bProfile } = await admin.from("profiles").select("id").eq("id", meB.id);
+  const withdrawnLogin = await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password });
+  check("탈퇴 처리된 회원은 로그인 불가, 이유 안내", withdrawnLogin.status === 403 && withdrawnLogin.body?.error?.code === "WITHDRAWN");
+  check("탈퇴회원 로그인 실패 시 비밀번호가 틀리면 일반 안내", (await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: "wrong-password" })).status === 401);
+  const { data: bProfile } = await admin.from("profiles").select("status, withdrawn_at, name, phone, address, shipping_address, tier_id, admin_scopes").eq("id", meB.id).single();
   const { data: bCart } = await admin.from("cart_items").select("product_id").eq("user_id", meB.id);
-  check("탈퇴 처리 시 회원 정보와 장바구니 삭제", bProfile.length === 0 && bCart.length === 0);
+  check("탈퇴 처리 시 이메일·상태·날짜만 남고 장바구니 삭제", bProfile.status === "withdrawn" && Boolean(bProfile.withdrawn_at) && bProfile.name === null && bProfile.phone === null && bProfile.address === null && bProfile.shipping_address === null && bProfile.tier_id === null && bProfile.admin_scopes.length === 0 && bCart.length === 0);
+  const withdrawnRow = (await manager(`/api/admin/members?${new URLSearchParams({ field: "email", q: accountB.email, role: "withdrawn" })}`)).body?.members?.[0];
+  check("탈퇴회원은 이메일과 탈퇴일로 목록에 남음", withdrawnRow?.id === meB.id && withdrawnRow.email === accountB.email && Boolean(withdrawnRow.withdrawnAt) && withdrawnRow.name === "");
+  check("탈퇴회원 정보 수정 거절", (await manager(memberUrl(meB.id), "PATCH", { status: "active", adminScopes: [] })).status === 409);
+  check("이미 탈퇴한 회원 탈퇴 처리 거절", (await manager(memberUrl(meB.id), "DELETE")).status === 409);
+  check("탈퇴한 이메일로 다시 가입 불가", (await guest("/api/auth/signup", "POST", accountB)).status === 409);
 
   // 내 정보 수정
   const profileEdit = { name: "바뀐 이름", phone: "010-1111-2222", address: "바뀐 주소지", shippingAddress: "바뀐 배송지", password: accountA.password };
@@ -438,8 +471,9 @@ try {
   check("로그아웃 후 정보 없음", (await userA("/api/auth/me")).body.user === null);
   check("다시 로그인", (await userA("/api/auth/login", "POST", { email: accountA.email, password: accountA.password })).status === 200);
   check("회원 탈퇴", (await userA("/api/auth/me", "DELETE")).status === 200);
-  const { data: profile } = await admin.from("profiles").select("id").eq("id", me.id);
-  check("탈퇴 시 회원 정보 삭제", profile.length === 0);
+  const { data: profile } = await admin.from("profiles").select("status, name, phone").eq("id", me.id).single();
+  check("탈퇴 시 회원 정보 삭제, 탈퇴 상태만 남음", profile.status === "withdrawn" && profile.name === null && profile.phone === null);
+  check("본인 탈퇴 후 로그인 불가", (await createBrowser()("/api/auth/login", "POST", { email: accountA.email, password: accountA.password })).body?.error?.code === "WITHDRAWN");
   const { data: cart } = await admin.from("cart_items").select("product_id").eq("user_id", me.id);
   check("탈퇴 시 장바구니 삭제", cart.length === 0);
   const { data: kept } = await admin.from("orders").select("user_id").eq("order_number", orderNumber).single();

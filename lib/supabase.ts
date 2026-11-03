@@ -44,8 +44,28 @@ export async function isPasswordCorrect(email: string, password: string) {
   return !error;
 }
 
+// 휴면·탈퇴 회원은 로그인 쿠키가 남아 있어도 로그인하지 않은 것으로 본다.
 export async function getCurrentUser() {
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();
-  return data.user;
+  if (!data.user) {
+    return null;
+  }
+
+  const { data: profile } = await createAdminClient()
+    .from("profiles")
+    .select("status")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  return profile && profile.status !== "active" ? null : data.user;
+}
+
+// 로그인 직후 회원 구분을 확인한다. 이용할 수 없으면 그 이유를 돌려준다.
+export async function getMemberStatus(userId: string): Promise<string | null> {
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("status")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.status ?? null;
 }

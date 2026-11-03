@@ -13,19 +13,30 @@ import type { ApiResult } from "@/lib/client-api";
 import { MAX_MEMBER_SEARCH_LENGTH } from "@/lib/limits";
 import { MEMBER_SEARCH_FIELDS } from "@/lib/member-search";
 import type { MemberSearchField } from "@/lib/member-search";
+import { MEMBER_ROLES, roleLabel, roleOf } from "@/lib/member-status";
+import type { MemberRole } from "@/lib/member-status";
 
 interface Search {
   field: MemberSearchField;
   query: string;
+  role: MemberRole | "all";
 }
 
-const EMPTY_SEARCH: Search = { field: "all", query: "" };
+const EMPTY_SEARCH: Search = { field: "all", query: "", role: "all" };
 
 const INPUT_CLASS =
   "rounded-lg border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700";
 
-function membersUrl({ field, query }: Search) {
-  const params = new URLSearchParams({ field, q: query.trim() });
+// 표의 구분 칸 글자색. 휴면·탈퇴는 눈에 띄게 한다.
+const ROLE_CLASS: Record<MemberRole, string> = {
+  admin: "text-blue-700 dark:text-blue-300",
+  active: "",
+  dormant: "text-orange-700 dark:text-orange-300",
+  withdrawn: "text-zinc-500 dark:text-zinc-400",
+};
+
+function membersUrl({ field, query, role }: Search) {
+  const params = new URLSearchParams({ field, q: query.trim(), role });
   return `/api/admin/members?${params}`;
 }
 
@@ -84,8 +95,11 @@ export default function AdminMembersPage() {
   // 등급을 지정받지 않은 회원은 기본 등급으로 보여 준다.
   const tierIdOf = (member: Member) =>
     member.tierId ?? tiers.find(({ isDefault }) => isDefault)?.id ?? "";
+  // 등급은 일반회원에게만 있다.
   const tierNameOf = (member: Member) =>
-    tiers.find(({ id }) => id === tierIdOf(member))?.name ?? "-";
+    roleOf(member) === "active"
+      ? (tiers.find(({ id }) => id === tierIdOf(member))?.name ?? "-")
+      : "-";
   const scopesOf = (member: Member) =>
     member.isAdmin
       ? "전체"
@@ -138,7 +152,10 @@ export default function AdminMembersPage() {
   async function handleSave(member: Member, changes: MemberChanges) {
     setMessage("");
     setIsSaving(true);
-    const result = await callApi(`/api/admin/members/${member.id}`, "PATCH", changes);
+    // 등급은 일반회원에게만 지정하므로 휴면회원으로 둘 때는 보내지 않는다.
+    const { tierId, ...rest } = changes;
+    const body = changes.status === "active" ? { ...rest, tierId } : rest;
+    const result = await callApi(`/api/admin/members/${member.id}`, "PATCH", body);
     setIsSaving(false);
     if (!result.ok) {
       setError(result.errorMessage);
@@ -170,7 +187,7 @@ export default function AdminMembersPage() {
 
   async function handleWithdraw(member: Member) {
     const isConfirmed = window.confirm(
-      `${member.name}(${member.email}) 회원을 탈퇴 처리할까요? 회원 정보와 장바구니가 삭제되고 되돌릴 수 없습니다. 주문 기록은 법에 따라 보관됩니다.`,
+      `${member.name}(${member.email}) 회원을 탈퇴 처리할까요? 이메일과 탈퇴 날짜만 남기고 회원 정보와 장바구니가 삭제되며 되돌릴 수 없습니다. 주문 기록은 법에 따라 보관됩니다.`,
     );
     if (!isConfirmed) {
       return;
@@ -192,7 +209,7 @@ export default function AdminMembersPage() {
     return <main className="px-4 py-6 text-sm">권한을 확인하는 중</main>;
   }
 
-  const isSearching = search.query.trim() !== "";
+  const isSearching = search.query.trim() !== "" || search.role !== "all";
   // 회원을 골랐으면 상세 정보 안에, 아니면 표 위에 안내를 보여 준다.
   const notice = (
     <>
@@ -254,6 +271,23 @@ export default function AdminMembersPage() {
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-1">
+          회원 구분
+          <select
+            value={draft.role}
+            onChange={(event) =>
+              setDraft({ ...draft, role: event.target.value as Search["role"] })
+            }
+            className={INPUT_CLASS}
+          >
+            <option value="all">전체</option>
+            {MEMBER_ROLES.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex min-w-48 flex-1 flex-col gap-1 sm:max-w-sm">
           검색어
           <input
@@ -287,11 +321,11 @@ export default function AdminMembersPage() {
 
       {/* 휴대폰처럼 좁은 화면에서는 표만 가로로 밀어서 본다. */}
       <div className="mt-3 max-h-[28rem] overflow-auto rounded-xl border border-zinc-200 bg-white/80 dark:border-zinc-700 dark:bg-zinc-900/80">
-        <table className="w-full min-w-[44rem] border-collapse text-left">
+        <table className="w-full min-w-[50rem] border-collapse text-left">
           <caption className="sr-only">회원 목록. 행을 고르면 아래에 상세 정보가 나옵니다.</caption>
           <thead className="sticky top-0 bg-zinc-100 dark:bg-zinc-800">
             <tr>
-              {["아이디", "성명", "휴대폰", "등급", "관리 권한", "가입일"].map((title) => (
+              {["아이디", "성명", "구분", "휴대폰", "등급", "관리 권한", "가입일"].map((title) => (
                 <th key={title} scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
                   {title}
                 </th>
@@ -301,13 +335,14 @@ export default function AdminMembersPage() {
           <tbody>
             {members.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-zinc-600 dark:text-zinc-400">
-                  {isSearching ? "검색어에 맞는 회원이 없습니다." : "회원이 없습니다."}
+                <td colSpan={7} className="px-3 py-6 text-center text-zinc-600 dark:text-zinc-400">
+                  {isSearching ? "조건에 맞는 회원이 없습니다." : "회원이 없습니다."}
                 </td>
               </tr>
             )}
             {members.map((member) => {
               const isSelected = member.id === selectedId;
+              const role = roleOf(member);
               return (
                 <tr
                   key={member.id}
@@ -323,10 +358,13 @@ export default function AdminMembersPage() {
                 >
                   <td className="px-3 py-2 break-all">{member.email}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    {member.name}
+                    {member.name || "-"}
                     {member.isSelf && <span className="ml-1 text-xs text-zinc-500">(나)</span>}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">{member.phone}</td>
+                  <td className={`px-3 py-2 whitespace-nowrap ${ROLE_CLASS[role]}`}>
+                    {roleLabel(role)}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">{member.phone || "-"}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{tierNameOf(member)}</td>
                   <td className="px-3 py-2">{scopesOf(member)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{formatJoinedAt(member.joinedAt)}</td>

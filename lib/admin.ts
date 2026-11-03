@@ -6,7 +6,7 @@ import { createAdminClient, getCurrentUser } from "@/lib/supabase";
 // 이 파일은 서버 전용 키를 쓰므로 서버 쪽 코드에서만 가져온다.
 
 // 관리 권한은 회원이 바꿀 수 없는 서버 쪽 값으로만 판단한다.
-// isAdmin은 전체 관리자 계정이고, 모든 권한 범위를 가진다.
+// isAdmin은 시스템관리자 계정이고, 모든 권한 범위를 가진다.
 export async function getAdminUser() {
   const user = await getCurrentUser();
   if (!user) {

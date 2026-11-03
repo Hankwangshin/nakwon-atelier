@@ -30,16 +30,20 @@ export async function getTiers(): Promise<MembershipTier[]> {
 }
 
 // 등급을 지정받지 않은 회원은 기본 등급으로 계산한다.
+// 등급은 일반회원에게만 주므로 시스템관리자 등 그 밖의 회원은 할인하지 않는다.
 export async function getMemberDiscount(userId: string): Promise<MemberDiscount> {
   const admin = createAdminClient();
   const { data: profile, error } = await admin
     .from("profiles")
-    .select("tier_id")
+    .select("tier_id, is_admin, status")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     throw new Error(`member tier read failed: ${error.code}`);
+  }
+  if (profile && (profile.is_admin || profile.status !== "active")) {
+    return { tierName: "", percent: 0 };
   }
 
   const query = admin.from("membership_tiers").select("name, discount_percent");

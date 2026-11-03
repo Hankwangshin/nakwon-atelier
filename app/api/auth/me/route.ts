@@ -7,6 +7,7 @@ import {
   serverFailedResponse,
 } from "@/lib/http";
 import { findAddressesProblem, findProfileProblem } from "@/lib/member-input";
+import { withdrawMember } from "@/lib/member-withdraw";
 import {
   createAdminClient,
   createUserClient,
@@ -80,8 +81,8 @@ export async function PATCH(request: Request) {
   return Response.json({ ok: true });
 }
 
-// 회원 탈퇴. 회원 정보와 장바구니는 파기하고, 주문 기록은 법정 보관을 위해
-// 회원 연결만 끊어 남긴다.
+// 회원 탈퇴. 이메일, 탈퇴 상태, 탈퇴 날짜만 남기고 회원 정보와 장바구니는 파기한다.
+// 주문 기록은 법정 보관을 위해 회원 연결만 끊어 남긴다.
 export async function DELETE() {
   const { user, isAdmin } = await getAdminUser();
   if (!user) {
@@ -89,13 +90,14 @@ export async function DELETE() {
   }
   // 관리자가 모두 사라지면 관리 기능을 쓸 수 없게 되므로 막는다.
   if (isAdmin) {
-    return errorResponse("ADMIN_PROTECTED", "관리자 계정은 탈퇴할 수 없습니다.", 409);
+    return errorResponse("ADMIN_PROTECTED", "시스템관리자 계정은 탈퇴할 수 없습니다.", 409);
   }
 
   const supabase = await createUserClient();
-  const { error } = await createAdminClient().auth.admin.deleteUser(user.id);
-  if (error) {
-    logFailure("withdraw failed", error);
+  try {
+    await withdrawMember(user.id);
+  } catch (error) {
+    logFailure("withdraw failed", error as { code?: string });
     return serverFailedResponse();
   }
 

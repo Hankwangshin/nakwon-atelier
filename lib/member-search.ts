@@ -1,4 +1,5 @@
 import { MAX_MEMBER_SEARCH_LENGTH } from "@/lib/limits";
+import { isMemberRole } from "@/lib/member-status";
 
 // 회원 관리 검색 조건. 화면과 서버가 같은 목록을 쓴다. 아이디는 로그인 이메일이다.
 export const MEMBER_SEARCH_FIELDS = [
@@ -13,9 +14,12 @@ export function isMemberSearchField(value: unknown): value is MemberSearchField 
   return MEMBER_SEARCH_FIELDS.some(({ id }) => id === value);
 }
 
-export function findSearchProblem(field: unknown, query: string): string | null {
+export function findSearchProblem(field: unknown, query: string, role: unknown): string | null {
   if (!isMemberSearchField(field)) {
     return "검색 조건을 확인해 주세요.";
+  }
+  if (role !== "all" && !isMemberRole(role)) {
+    return "회원 구분을 확인해 주세요.";
   }
   if (query.length > MAX_MEMBER_SEARCH_LENGTH) {
     return `검색어는 ${MAX_MEMBER_SEARCH_LENGTH}자 이하로 입력해 주세요.`;
