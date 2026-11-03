@@ -13,10 +13,6 @@ export async function POST(request: Request) {
   const supabase = await createUserClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  // 탈퇴회원은 Supabase에서 로그인이 막혀 있다(비밀번호가 맞을 때만 이 코드가 온다).
-  if (error?.code === "user_banned") {
-    return errorResponse("WITHDRAWN", WITHDRAWN_LOGIN_MESSAGE, 403);
-  }
   if (error || !data.user) {
     return errorResponse(
       "LOGIN_FAILED",
@@ -26,6 +22,7 @@ export async function POST(request: Request) {
   }
 
   // 비밀번호가 맞아도 휴면·탈퇴 회원이면 바로 로그아웃시키고 이유를 알려 준다.
+  // 비밀번호가 맞을 때만 알려 주므로 남이 이메일만으로 회원 구분을 알아낼 수 없다.
   const status = await getMemberStatus(data.user.id);
   if (status === "dormant" || status === "withdrawn") {
     await supabase.auth.signOut({ scope: "local" });

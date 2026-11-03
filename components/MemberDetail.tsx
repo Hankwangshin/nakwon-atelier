@@ -142,7 +142,7 @@ export default function MemberDetail({
       className="mt-4 rounded-xl border border-zinc-200 bg-white/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/80"
     >
       <h2 id="member-detail-title" className="font-semibold">
-        회원 상세 정보 · {member.name}
+        회원 상세 정보 · {member.name || member.email}
         {isEditing && <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">수정 중</span>}
       </h2>
       {isLocked && <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{lockReason}</p>}
