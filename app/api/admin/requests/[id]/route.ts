@@ -1,4 +1,4 @@
-import { denyUnlessAllowed } from "@/lib/admin";
+import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import { createAdminClient } from "@/lib/supabase";
 import { cancelPayment } from "@/lib/toss";
@@ -86,7 +86,7 @@ export async function PATCH(
   httpRequest: Request,
   context: RouteContext<"/api/admin/requests/[id]">,
 ) {
-  const denied = await denyUnlessAllowed("requests");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }

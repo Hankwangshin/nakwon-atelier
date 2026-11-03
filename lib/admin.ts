@@ -1,35 +1,30 @@
-import { ALL_ADMIN_SCOPES } from "@/lib/admin-scopes";
-import type { AdminScope } from "@/lib/admin-scopes";
 import { errorResponse, loginRequiredResponse } from "@/lib/http";
 import { createAdminClient, getCurrentUser } from "@/lib/supabase";
 
 // 이 파일은 서버 전용 키를 쓰므로 서버 쪽 코드에서만 가져온다.
 
-// 관리 권한은 회원이 바꿀 수 없는 서버 쪽 값으로만 판단한다.
-// isAdmin은 시스템관리자 계정이고, 모든 권한 범위를 가진다.
+// 관리 메뉴는 시스템관리자(is_admin)만 쓴다. 회원이 바꿀 수 없는 서버 쪽 값으로만 판단한다.
 export async function getAdminUser() {
   const user = await getCurrentUser();
   if (!user) {
-    return { user: null, isAdmin: false, scopes: [] as AdminScope[] };
+    return { user: null, isAdmin: false };
   }
 
   const { data } = await createAdminClient()
     .from("profiles")
-    .select("is_admin, admin_scopes")
+    .select("is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  const isAdmin = data?.is_admin === true;
-  const scopes: AdminScope[] = isAdmin ? ALL_ADMIN_SCOPES : (data?.admin_scopes ?? []);
-  return { user, isAdmin, scopes };
+  return { user, isAdmin: data?.is_admin === true };
 }
 
-export async function denyUnlessAllowed(scope: AdminScope) {
-  const { user, scopes } = await getAdminUser();
+export async function denyUnlessAdmin() {
+  const { user, isAdmin } = await getAdminUser();
   if (!user) {
     return loginRequiredResponse();
   }
-  return scopes.includes(scope)
+  return isAdmin
     ? null
-    : errorResponse("FORBIDDEN", "이 메뉴를 사용할 권한이 없습니다.", 403);
+    : errorResponse("FORBIDDEN", "시스템관리자만 사용할 수 있는 메뉴입니다.", 403);
 }

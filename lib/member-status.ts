@@ -10,11 +10,11 @@ export const MEMBER_ROLES = [
 export type MemberRole = (typeof MEMBER_ROLES)[number]["id"];
 export type MemberStatus = Exclude<MemberRole, "admin">;
 
-// 관리자가 회원 관리에서 직접 바꿀 수 있는 상태. 탈퇴는 탈퇴 처리 버튼으로만 한다.
-export const CHANGEABLE_STATUSES: MemberStatus[] = ["active", "dormant"];
+// 시스템관리자가 회원 상세에서 직접 고를 수 있는 구분. 탈퇴는 탈퇴 처리 버튼으로만 한다.
+export const CHANGEABLE_ROLES: MemberRole[] = ["admin", "active", "dormant"];
 
-export function isChangeableStatus(value: unknown): value is MemberStatus {
-  return CHANGEABLE_STATUSES.includes(value as MemberStatus);
+export function isChangeableRole(value: unknown): value is MemberRole {
+  return CHANGEABLE_ROLES.includes(value as MemberRole);
 }
 
 export function isMemberRole(value: unknown): value is MemberRole {

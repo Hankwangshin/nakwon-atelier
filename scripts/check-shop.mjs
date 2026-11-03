@@ -322,13 +322,13 @@ try {
   check("기본 등급 삭제 거절", (await manager(`${tierUrl}/${defaultTier.id}`, "DELETE")).status === 409);
 
   const memberUrl = (id) => `/api/admin/members/${id}`;
-  check("일반 회원 등급 지정 거절", (await userA(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 403);
-  check("없는 권한 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: ["payments"] })).status === 400);
-  check("없는 등급 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: "00000000-0000-0000-0000-000000000000", adminScopes: [] })).status === 404);
-  check("없는 회원 거절", (await manager(memberUrl("00000000-0000-0000-0000-000000000000"), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 404);
-  check("본인 등급 변경 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 403);
+  check("일반 회원 등급 지정 거절", (await userA(memberUrl(me.id), "PATCH", { tierId: newTier.id })).status === 403);
+  check("없는 구분 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id, role: "owner" })).status === 400);
+  check("없는 등급 거절", (await manager(memberUrl(me.id), "PATCH", { tierId: "00000000-0000-0000-0000-000000000000" })).status === 404);
+  check("없는 회원 거절", (await manager(memberUrl("00000000-0000-0000-0000-000000000000"), "PATCH", { tierId: newTier.id })).status === 404);
+  check("본인 등급 변경 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", { tierId: newTier.id })).status === 403);
   check("할인 전 금액", (await userA("/api/cart")).body.amount === 12000);
-  check("관리자가 등급 지정", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id, adminScopes: [] })).status === 200);
+  check("관리자가 등급 지정", (await manager(memberUrl(me.id), "PATCH", { tierId: newTier.id })).status === 200);
   const discounted = (await userA("/api/cart")).body;
   check("할인은 상품 금액에만 적용", discounted.discountAmount === 900 && discounted.shippingFee === 3000 && discounted.amount === 11100);
   check("1원 미만은 할인액에서 버림", summarizeCart([{ product_id: "x", quantity: 1 }], [{ id: "x", price: 999, shipping: "무료" }], { tierName: "t", percent: 15 }).discountAmount === 149);
@@ -340,26 +340,25 @@ try {
   check("지난 주문의 할인은 그대로", savedOrder.amount === 11100 && savedOrder.discount_percent === 10 && savedOrder.discount_amount === 900 && savedOrder.tier_name === tierName);
   const { data: tierRows } = await anon.from("membership_tiers").select("*");
   check("공개 키로 등급을 볼 수 없음", (tierRows ?? []).length === 0);
-  await signedIn.from("profiles").update({ tier_id: newTier.id, admin_scopes: ["members"] }).eq("id", meB.id);
-  const { data: selfRaised } = await admin.from("profiles").select("tier_id, admin_scopes").eq("id", meB.id).single();
-  check("회원이 스스로 등급과 권한을 올릴 수 없음", selfRaised.tier_id === null && selfRaised.admin_scopes.length === 0);
+  await signedIn.from("profiles").update({ tier_id: newTier.id, is_admin: true }).eq("id", meB.id);
+  const { data: selfRaised } = await admin.from("profiles").select("tier_id, is_admin").eq("id", meB.id).single();
+  check("회원이 스스로 등급을 올리거나 시스템관리자가 될 수 없음", selfRaised.tier_id === null && selfRaised.is_admin === false);
   check("등급 삭제", (await manager(`${tierUrl}/${newTier.id}`, "DELETE")).status === 200);
   check("등급을 지우면 기본 등급으로 계산", (await userA("/api/cart")).body.amount === 12000);
 
   // 관리 권한 범위
-  check("상품 권한 부여", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["products"] })).status === 200);
-  check("권한이 내 정보에 표시", (await userA("/api/auth/me")).body.user.adminScopes.join() === "products");
-  check("상품 권한으로 상품 관리 가능", (await userA("/api/admin/products")).status === 200);
-  check("상품 권한으로 회원 관리 거절", (await userA("/api/admin/members")).status === 403);
-  check("상품 권한으로 요청 관리 거절", (await userA("/api/admin/requests")).status === 403);
-  check("회원 권한 부여", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["members"] })).status === 200);
-  check("회원 권한으로 회원 관리 가능", (await userA("/api/admin/members")).status === 200);
-  check("회원 권한으로 상품 관리 거절", (await userA("/api/admin/products")).status === 403);
-  check("본인 권한은 스스로 늘릴 수 없음", (await userA(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: ["members", "products"] })).status === 403);
-  check("전체 관리자 계정은 바꿀 수 없음", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 409);
-  check("권한 회수", (await manager(memberUrl(me.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 200);
-  check("회수 후 바로 거절", (await userA("/api/admin/members")).status === 403);
-  check("전체 관리자는 모든 권한", (await manager("/api/auth/me")).body.user.adminScopes.length === 3);
+  check("일반회원은 상품 관리 거절", (await userA("/api/admin/products")).status === 403);
+  check("일반회원은 회원 관리 거절", (await userA("/api/admin/members")).status === 403);
+  check("일반회원은 구분을 바꿀 수 없음", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { role: "active" })).status === 403);
+  check("시스템관리자로 지정하며 등급 지정 거절", (await manager(memberUrl(me.id), "PATCH", { role: "admin", tierId: defaultTier.id })).body?.error?.code === "TIER_ACTIVE_ONLY");
+  check("시스템관리자로 지정", (await manager(memberUrl(me.id), "PATCH", { role: "admin" })).status === 200);
+  check("지정되면 내 정보에 시스템관리자 표시", (await userA("/api/auth/me")).body.user.isAdmin === true);
+  check("시스템관리자는 상품·회원·요청 관리 가능", (await userA("/api/admin/products")).status === 200 && (await userA("/api/admin/members")).status === 200 && (await userA("/api/admin/requests")).status === 200);
+  check("본인 구분은 스스로 못 바꿈", (await userA(memberUrl(me.id), "PATCH", { role: "active" })).status === 403);
+  check("시스템관리자 해제", (await manager(memberUrl(me.id), "PATCH", { role: "active" })).status === 200);
+  check("해제하면 바로 관리 메뉴 거절", (await userA("/api/admin/products")).status === 403 && (await userA("/api/auth/me")).body.user.isAdmin === false);
+  check("시스템관리자 표시", (await manager("/api/auth/me")).body.user.isAdmin === true);
+  check("내 정보에 영역 권한을 보내지 않음", !("adminScopes" in (await manager("/api/auth/me")).body.user));
 
   // 회원 관리
   check("비회원 회원 목록 거절", (await guest("/api/admin/members")).status === 401);
@@ -388,25 +387,25 @@ try {
   check("휴대폰 형식 거절(추가)", (await manager("/api/admin/members", "POST", { ...created, phone: "1234" })).status === 400);
   check("빈 주소지 거절(추가)", (await manager("/api/admin/members", "POST", { ...created, address: " " })).status === 400);
   check("이미 가입한 이메일 거절", (await manager("/api/admin/members", "POST", { ...created, email: accountA.email })).status === 409);
-  const createdRes = await manager("/api/admin/members", "POST", { ...created, isAdmin: true, adminScopes: ["members"] });
+  const createdRes = await manager("/api/admin/members", "POST", { ...created, isAdmin: true });
   check("관리자가 회원 추가", createdRes.status === 201 && Boolean(createdRes.body?.id));
   if (createdRes.body?.id) createdIds.push(createdRes.body.id);
-  const createdRow = (await admin.from("profiles").select("name, is_admin, tier_id, admin_scopes, agreed_terms_at, agreed_privacy_at").eq("id", createdRes.body?.id).single()).data;
-  check("추가한 회원은 기본 등급·권한 없음·동의 시각 저장", createdRow?.is_admin === false && createdRow.tier_id === null && createdRow.admin_scopes.length === 0 && Boolean(createdRow.agreed_terms_at && createdRow.agreed_privacy_at));
+  const createdRow = (await admin.from("profiles").select("name, is_admin, tier_id, agreed_terms_at, agreed_privacy_at").eq("id", createdRes.body?.id).single()).data;
+  check("추가한 회원은 기본 등급의 일반회원·동의 시각 저장", createdRow?.is_admin === false && createdRow.tier_id === null && Boolean(createdRow.agreed_terms_at && createdRow.agreed_privacy_at));
   check("추가한 회원이 목록에 보임", (await searchNames("email", created.email)).includes(createdRes.body?.id));
   check("추가한 회원이 첫 비밀번호로 로그인", (await createBrowser()("/api/auth/login", "POST", { email: created.email, password: created.password })).status === 200);
 
-  const memberEdit = { tierId: defaultTier.id, adminScopes: [], name: "관리자가 고친 이름", phone: "010-3333-4444", address: "고친 주소지", shippingAddress: "" };
+  const memberEdit = { tierId: defaultTier.id, name: "관리자가 고친 이름", phone: "010-3333-4444", address: "고친 주소지", shippingAddress: "" };
   check("관리자 수정 시 휴대폰 형식 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, phone: "1234" })).status === 400);
   check("관리자 수정 시 빈 성명 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: " " })).status === 400);
   check("관리자 수정 시 긴 주소 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, address: "가".repeat(201) })).status === 400);
   check("관리자가 회원 정보 수정", (await manager(memberUrl(me.id), "PATCH", memberEdit)).status === 200);
   const editedByAdmin = (await manager("/api/admin/members?field=name&q=관리자가 고친")).body.members.find(({ id }) => id === me.id);
   check("수정한 값이 목록에 반영, 빈 배송지는 비움", editedByAdmin?.phone === "010-3333-4444" && editedByAdmin.address === "고친 주소지" && editedByAdmin.shippingAddress === "");
-  check("본인(시스템관리자) 정보 수정 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", memberEdit)).status === 403);
+  check("본인 정보는 회원 관리에서 수정 거절", (await manager(memberUrl(tempAdmin.user.id), "PATCH", memberEdit)).status === 403);
   await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: "시험 회원" });
   const adminMember = memberList.body.members.find(({ id }) => id === tempAdmin.user.id);
-  check("관리자 계정은 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
+  check("시스템관리자는 탈퇴 처리 불가", (await manager(`/api/admin/members/${adminMember.id}`, "DELETE")).status === 409);
   check("관리자 계정은 스스로 탈퇴 불가", (await manager("/api/auth/me", "DELETE")).status === 409);
   check("없는 회원 탈퇴 처리는 404", (await manager("/api/admin/members/00000000-0000-0000-0000-000000000000", "DELETE")).status === 404);
   await userB("/api/cart", "POST", { productId: "p01", quantity: 1 });
@@ -415,10 +414,10 @@ try {
   const listRole = async (role) => (await manager(`/api/admin/members?${new URLSearchParams({ field: "all", q: "", role })}`)).body?.members?.map(({ id }) => id) ?? [];
   check("시스템관리자 구분 필터", (await listRole("admin")).includes(tempAdmin.user.id) && !(await listRole("active")).includes(tempAdmin.user.id));
   check("없는 구분 거절", (await manager("/api/admin/members?role=vip")).status === 400);
-  check("휴면으로 바꾸며 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { status: "dormant", tierId: defaultTier.id, adminScopes: [] })).body?.error?.code === "TIER_ACTIVE_ONLY");
-  check("구분을 탈퇴로 바꾸기 거절(탈퇴 처리로만)", (await manager(memberUrl(meB.id), "PATCH", { status: "withdrawn", adminScopes: [] })).status === 400);
-  check("시스템관리자를 휴면으로 바꾸기 거절", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { status: "dormant", adminScopes: [] })).status === 403);
-  check("관리자가 휴면으로 바꿈", (await manager(memberUrl(meB.id), "PATCH", { status: "dormant", adminScopes: [] })).status === 200);
+  check("휴면으로 바꾸며 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { role: "dormant", tierId: defaultTier.id })).body?.error?.code === "TIER_ACTIVE_ONLY");
+  check("구분을 탈퇴로 바꾸기 거절(탈퇴 처리로만)", (await manager(memberUrl(meB.id), "PATCH", { role: "withdrawn" })).status === 400);
+  check("일반회원은 시스템관리자를 휴면으로 못 바꿈", (await userA(memberUrl(tempAdmin.user.id), "PATCH", { role: "dormant" })).status === 403);
+  check("관리자가 휴면으로 바꿈", (await manager(memberUrl(meB.id), "PATCH", { role: "dormant" })).status === 200);
   check("휴면 구분 필터", (await listRole("dormant")).includes(meB.id) && !(await listRole("active")).includes(meB.id));
   check("휴면회원은 로그인 쿠키가 있어도 로그아웃 상태", (await userB("/api/auth/me")).body.user === null);
   check("휴면회원 장바구니 서버 요청 거절", (await userB("/api/cart")).status === 401);
@@ -426,10 +425,22 @@ try {
   check("휴면회원은 공개 키로도 자기 장바구니를 못 봄", (dormantCart ?? []).length === 0);
   const dormantLogin = await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password });
   check("휴면회원 로그인 거절과 이유 안내", dormantLogin.status === 403 && dormantLogin.body?.error?.code === "DORMANT");
-  check("휴면회원 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { tierId: defaultTier.id, adminScopes: [] })).status === 409);
-  check("일반회원으로 되돌림", (await manager(memberUrl(meB.id), "PATCH", { status: "active", adminScopes: [] })).status === 200);
+  check("휴면회원 등급 지정 거절", (await manager(memberUrl(meB.id), "PATCH", { tierId: defaultTier.id })).status === 409);
+  check("일반회원으로 되돌림", (await manager(memberUrl(meB.id), "PATCH", { role: "active" })).status === 200);
   check("되돌리면 다시 로그인", (await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password })).status === 200);
   check("되돌리면 기존 로그인도 다시 사용", (await userB("/api/auth/me")).body.user?.id === meB.id);
+  // 관리자의 비밀번호 재설정
+  const newPassword = randomBytes(12).toString("hex");
+  check("짧은 새 비밀번호 거절", (await manager(memberUrl(meB.id), "PATCH", { password: "short", passwordConfirm: "short" })).status === 400);
+  check("새 비밀번호 확인 불일치 거절", (await manager(memberUrl(meB.id), "PATCH", { password: newPassword, passwordConfirm: newPassword + "x" })).status === 400);
+  check("일반회원은 남의 비밀번호를 못 바꿈", (await userA(memberUrl(meB.id), "PATCH", { password: newPassword, passwordConfirm: newPassword })).status === 403);
+  check("본인 비밀번호는 회원 관리에서 못 바꿈", (await manager(memberUrl(tempAdmin.user.id), "PATCH", { password: newPassword, passwordConfirm: newPassword })).status === 403);
+  const passwordRes = await manager(memberUrl(meB.id), "PATCH", { password: newPassword, passwordConfirm: newPassword });
+  check("시스템관리자가 비밀번호 재설정", passwordRes.status === 200 && !JSON.stringify(passwordRes.body).includes(newPassword));
+  check("재설정하면 그 회원의 기존 로그인이 끊김", (await userB("/api/auth/me")).body.user === null);
+  check("예전 비밀번호로 로그인 불가", (await createBrowser()("/api/auth/login", "POST", { email: accountB.email, password: accountB.password })).status === 401);
+  accountB.password = newPassword;
+  check("새 비밀번호로 로그인", (await userB("/api/auth/login", "POST", { email: accountB.email, password: newPassword })).status === 200);
   // 등급 할인은 일반회원만
   const vvip = tierList.find(({ name }) => name === "VVIP") ?? newTier;
   await admin.from("profiles").update({ tier_id: vvip?.id ?? null }).eq("id", tempAdmin.user.id);
@@ -446,7 +457,8 @@ try {
   check("탈퇴 처리 시 이메일·상태·날짜만 남고 장바구니 삭제", bProfile.status === "withdrawn" && Boolean(bProfile.withdrawn_at) && bProfile.name === null && bProfile.phone === null && bProfile.address === null && bProfile.shipping_address === null && bProfile.tier_id === null && bProfile.admin_scopes.length === 0 && bCart.length === 0);
   const withdrawnRow = (await manager(`/api/admin/members?${new URLSearchParams({ field: "email", q: accountB.email, role: "withdrawn" })}`)).body?.members?.[0];
   check("탈퇴회원은 이메일과 탈퇴일로 목록에 남음", withdrawnRow?.id === meB.id && withdrawnRow.email === accountB.email && Boolean(withdrawnRow.withdrawnAt) && withdrawnRow.name === "");
-  check("탈퇴회원 정보 수정 거절", (await manager(memberUrl(meB.id), "PATCH", { status: "active", adminScopes: [] })).status === 409);
+  check("탈퇴회원 비밀번호 재설정 거절", (await manager(memberUrl(meB.id), "PATCH", { password: newPassword, passwordConfirm: newPassword })).status === 409);
+  check("탈퇴회원 정보 수정 거절", (await manager(memberUrl(meB.id), "PATCH", { role: "active" })).status === 409);
   check("이미 탈퇴한 회원 탈퇴 처리 거절", (await manager(memberUrl(meB.id), "DELETE")).status === 409);
   check("탈퇴한 이메일로 다시 가입 불가", (await guest("/api/auth/signup", "POST", accountB)).status === 409);
 

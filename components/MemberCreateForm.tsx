@@ -54,7 +54,7 @@ export default function MemberCreateForm({ onCreated, onCancel }: MemberCreateFo
         회원 추가
       </h2>
       <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-        새 회원은 기본 등급이고 관리 권한이 없습니다. 첫 비밀번호는 회원에게 따로 알려 주세요.
+        새 회원은 기본 등급의 일반회원입니다. 첫 비밀번호는 회원에게 따로 알려 주세요.
         저장한 뒤에는 다시 볼 수 없습니다.
       </p>
       <form onSubmit={handleSubmit} className="mt-3">

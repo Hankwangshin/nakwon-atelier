@@ -1,4 +1,4 @@
-import { denyUnlessAllowed } from "@/lib/admin";
+import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import { getTiers, parseTierInput } from "@/lib/member-tiers";
 import { createAdminClient } from "@/lib/supabase";
@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase";
 const UNIQUE_VIOLATION = "23505";
 
 export async function GET() {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }

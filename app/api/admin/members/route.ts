@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { denyUnlessAllowed } from "@/lib/admin";
+import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import {
   findAccountProblem,
@@ -18,7 +18,7 @@ const MEMBERS_PER_PAGE = 1000;
 // ?field=all|email|name&q=검색어 로 아이디(로그인 이메일)나 성명을 찾고,
 // &role=all|admin|active|dormant|withdrawn 으로 회원 구분을 골라 본다.
 export async function GET(request: NextRequest) {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const { data: profiles, error } = await admin
     .from("profiles")
     .select(
-      "id, name, phone, address, shipping_address, is_admin, status, withdrawn_at, tier_id, admin_scopes, created_at",
+      "id, name, phone, address, shipping_address, is_admin, status, withdrawn_at, tier_id, created_at",
     )
     .order("created_at", { ascending: false });
 
@@ -68,7 +68,6 @@ export async function GET(request: NextRequest) {
     withdrawnAt: profile.withdrawn_at,
     isSelf: profile.id === currentUser?.id,
     tierId: profile.tier_id,
-    adminScopes: profile.admin_scopes,
     joinedAt: profile.created_at,
   }));
 
@@ -83,9 +82,9 @@ export async function GET(request: NextRequest) {
 
 // 관리자가 회원을 대신 등록한다. 회원가입과 같은 기준으로 입력을 검사하고,
 // 회원 본인에게 동의를 받았다는 관리자 확인이 있어야 저장한다.
-// 새 회원은 기본 등급이고 관리 권한은 없다.
+// 새 회원은 기본 등급의 일반회원이다.
 export async function POST(request: Request) {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }

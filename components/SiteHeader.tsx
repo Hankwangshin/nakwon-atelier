@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ADMIN_SCOPES } from "@/lib/admin-scopes";
-import type { AdminScope } from "@/lib/admin-scopes";
+import { ADMIN_MENUS } from "@/lib/admin-menus";
 import NavLink from "@/components/NavLink";
 import { callApi } from "@/lib/client-api";
 
@@ -16,13 +15,13 @@ const LINKS = [
 ];
 
 interface Me {
-  user: { name?: string; adminScopes?: AdminScope[] } | null;
+  user: { name?: string; isAdmin?: boolean } | null;
 }
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [adminScopes, setAdminScopes] = useState<AdminScope[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // 페이지를 옮길 때마다 로그인 상태를 다시 확인한다.
   // 빠르게 여러 번 옮기면 늦게 온 예전 답이 새 답을 덮지 않도록 마지막 확인만 반영한다.
@@ -33,7 +32,7 @@ export default function SiteHeader() {
         return;
       }
       setIsLoggedIn(Boolean(data?.user));
-      setAdminScopes(data?.user?.adminScopes ?? []);
+      setIsAdmin(data?.user?.isAdmin === true);
     });
     return () => {
       isLatest = false;
@@ -65,7 +64,8 @@ export default function SiteHeader() {
         <span className="ml-auto flex gap-3">
           {isLoggedIn ? (
             <>
-              {ADMIN_SCOPES.filter(({ id }) => adminScopes.includes(id)).map(({ href, label }) => (
+              {/* 관리 메뉴는 시스템관리자에게만 보인다. */}
+              {isAdmin && ADMIN_MENUS.map(({ href, label }) => (
                 <NavLink key={href} href={href}>
                   {label}
                 </NavLink>

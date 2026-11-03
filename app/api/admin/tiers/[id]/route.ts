@@ -1,4 +1,4 @@
-import { denyUnlessAllowed } from "@/lib/admin";
+import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import { parseTierInput } from "@/lib/member-tiers";
 import { createAdminClient } from "@/lib/supabase";
@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase";
 const UNIQUE_VIOLATION = "23505";
 
 export async function PATCH(request: Request, context: RouteContext<"/api/admin/tiers/[id]">) {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext<"/api/admin/
 
 // 등급을 지우면 그 회원들은 데이터베이스 규칙에 따라 기본 등급으로 돌아간다.
 export async function DELETE(_request: Request, context: RouteContext<"/api/admin/tiers/[id]">) {
-  const denied = await denyUnlessAllowed("members");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }

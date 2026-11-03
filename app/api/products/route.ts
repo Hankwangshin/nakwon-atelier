@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { denyUnlessAllowed } from "@/lib/admin";
+import { denyUnlessAdmin } from "@/lib/admin";
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
 import { getProducts, parseProductInput, toProductRow } from "@/lib/products";
 import { createAdminClient } from "@/lib/supabase";
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const denied = await denyUnlessAllowed("products");
+  const denied = await denyUnlessAdmin();
   if (denied) {
     return denied;
   }

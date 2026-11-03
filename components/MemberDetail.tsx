@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import type { Tier } from "@/components/TierManager";
-import { ADMIN_SCOPES } from "@/lib/admin-scopes";
-import type { AdminScope } from "@/lib/admin-scopes";
 import { MAX_ADDRESS_LENGTH } from "@/lib/limits";
-import { CHANGEABLE_STATUSES, roleLabel, roleOf } from "@/lib/member-status";
-import type { MemberStatus } from "@/lib/member-status";
+import { MIN_PASSWORD_LENGTH } from "@/lib/member-input";
+import { CHANGEABLE_ROLES, roleLabel, roleOf } from "@/lib/member-status";
+import type { MemberRole, MemberStatus } from "@/lib/member-status";
 
 export interface Member {
   id: string;
@@ -20,7 +19,6 @@ export interface Member {
   withdrawnAt: string | null;
   isSelf: boolean;
   tierId: string | null;
-  adminScopes: AdminScope[];
   joinedAt: string;
 }
 
@@ -29,9 +27,11 @@ export interface MemberChanges {
   phone: string;
   address: string;
   shippingAddress: string;
-  status: MemberStatus;
+  role: MemberRole;
   tierId: string;
-  adminScopes: AdminScope[];
+  // 비워 두면 비밀번호는 바꾸지 않는다.
+  password: string;
+  passwordConfirm: string;
 }
 
 interface MemberDetailProps {
@@ -82,21 +82,21 @@ export default function MemberDetail({
     phone: member.phone,
     address: member.address,
     shippingAddress: member.shippingAddress,
-    status: member.status,
+    role: roleOf(member),
     tierId,
-    adminScopes: member.adminScopes,
+    password: "",
+    passwordConfirm: "",
   };
   const [form, setForm] = useState<MemberChanges>(saved);
   const [isEditing, setIsEditing] = useState(false);
   const role = roleOf(member);
   const isWithdrawn = member.status === "withdrawn";
-  // 시스템관리자, 본인, 탈퇴회원은 서버에서도 막으므로 화면에서도 고칠 수 없게 둔다.
-  const isLocked = member.isAdmin || member.isSelf || isWithdrawn;
-  const lockReason = member.isAdmin
-    ? "시스템관리자 계정은 바꿀 수 없습니다."
-    : isWithdrawn
-      ? "탈퇴한 회원은 이메일과 탈퇴 날짜만 남아 있으며 바꿀 수 없습니다."
-      : "본인 계정은 여기서 바꿀 수 없습니다. 이름과 연락처는 내 정보 메뉴에서 고칠 수 있습니다.";
+  // 본인과 탈퇴회원은 서버에서도 막으므로 화면에서도 고칠 수 없게 둔다.
+  const isLocked = member.isSelf || isWithdrawn;
+  const lockReason = isWithdrawn
+    ? "탈퇴한 회원은 이메일과 탈퇴 날짜만 남아 있으며 바꿀 수 없습니다."
+    : "본인 계정은 여기서 바꿀 수 없습니다. 이름, 연락처, 비밀번호는 내 정보 메뉴에서 고칠 수 있습니다.";
+  const isPasswordMismatch = form.password !== form.passwordConfirm;
 
   // 등급은 일반회원에게만 있다.
   const tierLabel = (id: string) => {
@@ -106,11 +106,6 @@ export default function MemberDetail({
     const tier = tiers.find((item) => item.id === id);
     return tier ? `${tier.name} (${tier.discountPercent}%)` : "-";
   };
-  const scopeLabel = member.isAdmin
-    ? "모든 관리 권한"
-    : ADMIN_SCOPES.filter(({ id }) => member.adminScopes.includes(id))
-        .map(({ label }) => label)
-        .join(", ") || "없음";
 
   function changeEditing(next: boolean) {
     setIsEditing(next);
@@ -122,17 +117,11 @@ export default function MemberDetail({
     changeEditing(false);
   }
 
-  function toggleScope(scope: AdminScope) {
-    setForm({
-      ...form,
-      adminScopes: form.adminScopes.includes(scope)
-        ? form.adminScopes.filter((item) => item !== scope)
-        : [...form.adminScopes, scope],
-    });
-  }
-
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isPasswordMismatch) {
+      return;
+    }
     onSave(form);
   }
 
@@ -159,7 +148,6 @@ export default function MemberDetail({
             <Field label="성명" value={member.name} />
             <Field label="휴대폰" value={member.phone} />
             <Field label="등급" value={tierLabel(tierId)} />
-            <Field label="관리 권한" value={scopeLabel} />
             <Field label="주소지" value={member.address} wide />
             <Field label="배송지" value={member.shippingAddress} wide />
           </dl>
@@ -172,7 +160,8 @@ export default function MemberDetail({
             >
               수정
             </button>
-            {!isLocked && (
+            {/* 시스템관리자는 먼저 다른 구분으로 바꿔야 탈퇴 처리할 수 있다. */}
+            {!isLocked && !member.isAdmin && (
               <button
                 type="button"
                 onClick={onWithdraw}
@@ -219,24 +208,22 @@ export default function MemberDetail({
             <label className="flex flex-col gap-1">
               회원 구분
               <select
-                value={form.status}
-                onChange={(event) =>
-                  setForm({ ...form, status: event.target.value as MemberStatus })
-                }
+                value={form.role}
+                onChange={(event) => setForm({ ...form, role: event.target.value as MemberRole })}
                 className={INPUT_CLASS}
               >
-                {CHANGEABLE_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {roleLabel(status)}
+                {CHANGEABLE_ROLES.map((item) => (
+                  <option key={item} value={item}>
+                    {roleLabel(item)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              {form.status === "active" ? "등급" : "등급 (일반회원만 지정)"}
+              {form.role === "active" ? "등급" : "등급 (일반회원만 지정)"}
               <select
                 value={form.tierId}
-                disabled={form.status !== "active"}
+                disabled={form.role !== "active"}
                 onChange={(event) => setForm({ ...form, tierId: event.target.value })}
                 className={INPUT_CLASS}
               >
@@ -265,18 +252,39 @@ export default function MemberDetail({
                 className={INPUT_CLASS}
               />
             </label>
-            <fieldset className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-3">
-              <legend className="mb-1">관리 권한</legend>
-              {ADMIN_SCOPES.map(({ id, label }) => (
-                <label key={id} className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={form.adminScopes.includes(id)}
-                    onChange={() => toggleScope(id)}
-                  />
-                  {label}
-                </label>
-              ))}
+            <fieldset className="grid gap-3 rounded-lg border border-zinc-200 p-3 sm:col-span-2 sm:grid-cols-2 xl:col-span-3 dark:border-zinc-700">
+              <legend className="px-1">비밀번호 바꾸기 (바꾸지 않으려면 비워 두세요)</legend>
+              <p className="text-xs text-zinc-600 sm:col-span-2 dark:text-zinc-400">
+                기존 비밀번호는 볼 수 없습니다. 바꾸면 이 회원의 기존 로그인이 모두 끊기니 새
+                비밀번호를 회원에게 따로 알려 주세요.
+              </p>
+              <label className="flex flex-col gap-1">
+                새 비밀번호 ({MIN_PASSWORD_LENGTH}자 이상)
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                새 비밀번호 확인
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required={form.password !== ""}
+                  value={form.passwordConfirm}
+                  onChange={(event) => setForm({ ...form, passwordConfirm: event.target.value })}
+                  className={INPUT_CLASS}
+                />
+              </label>
+              {isPasswordMismatch && form.passwordConfirm !== "" && (
+                <p role="alert" className="text-xs text-red-600 sm:col-span-2 dark:text-red-400">
+                  새 비밀번호와 확인 값이 같지 않습니다.
+                </p>
+              )}
             </fieldset>
           </fieldset>
 

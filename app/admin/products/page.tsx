@@ -55,8 +55,8 @@ export default function AdminProductsPage() {
   }, []);
 
   useEffect(() => {
-    callApi<{ user: { adminScopes?: string[] } | null }>("/api/auth/me").then(({ data }) => {
-      if (!data?.user?.adminScopes?.includes("products")) {
+    callApi<{ user: { isAdmin?: boolean } | null }>("/api/auth/me").then(({ data }) => {
+      if (!data?.user?.isAdmin) {
         router.replace("/");
         return;
       }

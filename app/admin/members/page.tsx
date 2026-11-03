@@ -7,7 +7,6 @@ import MemberDetail, { formatJoinedAt } from "@/components/MemberDetail";
 import type { Member, MemberChanges } from "@/components/MemberDetail";
 import TierManager from "@/components/TierManager";
 import type { Tier } from "@/components/TierManager";
-import { ADMIN_SCOPES } from "@/lib/admin-scopes";
 import { callApi } from "@/lib/client-api";
 import type { ApiResult } from "@/lib/client-api";
 import { MAX_MEMBER_SEARCH_LENGTH } from "@/lib/limits";
@@ -100,12 +99,6 @@ export default function AdminMembersPage() {
     roleOf(member) === "active"
       ? (tiers.find(({ id }) => id === tierIdOf(member))?.name ?? "-")
       : "-";
-  const scopesOf = (member: Member) =>
-    member.isAdmin
-      ? "전체"
-      : ADMIN_SCOPES.filter(({ id }) => member.adminScopes.includes(id))
-          .map(({ label }) => label)
-          .join(", ") || "-";
 
   const selected = members?.find(({ id }) => id === selectedId) ?? null;
 
@@ -152,9 +145,14 @@ export default function AdminMembersPage() {
   async function handleSave(member: Member, changes: MemberChanges) {
     setMessage("");
     setIsSaving(true);
-    // 등급은 일반회원에게만 지정하므로 휴면회원으로 둘 때는 보내지 않는다.
-    const { tierId, ...rest } = changes;
-    const body = changes.status === "active" ? { ...rest, tierId } : rest;
+    // 등급은 일반회원에게만 지정하므로 다른 구분일 때는 보내지 않는다.
+    // 비밀번호 칸을 비워 두었으면 비밀번호도 보내지 않는다.
+    const { tierId, password, passwordConfirm, ...rest } = changes;
+    const body = {
+      ...rest,
+      ...(changes.role === "active" && { tierId }),
+      ...(password !== "" && { password, passwordConfirm }),
+    };
     const result = await callApi(`/api/admin/members/${member.id}`, "PATCH", body);
     setIsSaving(false);
     if (!result.ok) {
@@ -166,7 +164,11 @@ export default function AdminMembersPage() {
     // 상세를 저장된 값으로 다시 그리고 읽기 전용으로 돌린다.
     setIsEditing(false);
     setSavedCount((count) => count + 1);
-    setMessage(`${changes.name.trim()} 회원의 정보를 저장했습니다.`);
+    setMessage(
+      password !== ""
+        ? `${changes.name.trim()} 회원의 정보와 비밀번호를 저장했습니다. 이 회원의 기존 로그인은 끊겼습니다.`
+        : `${changes.name.trim()} 회원의 정보를 저장했습니다.`,
+    );
   }
 
   // 새 회원이 바로 보이도록 검색을 풀고 다시 불러온 뒤 그 회원을 고른다.
@@ -321,11 +323,11 @@ export default function AdminMembersPage() {
 
       {/* 휴대폰처럼 좁은 화면에서는 표만 가로로 밀어서 본다. */}
       <div className="mt-3 max-h-[28rem] overflow-auto rounded-xl border border-zinc-200 bg-white/80 dark:border-zinc-700 dark:bg-zinc-900/80">
-        <table className="w-full min-w-[50rem] border-collapse text-left">
+        <table className="w-full min-w-[44rem] border-collapse text-left">
           <caption className="sr-only">회원 목록. 행을 고르면 아래에 상세 정보가 나옵니다.</caption>
           <thead className="sticky top-0 bg-zinc-100 dark:bg-zinc-800">
             <tr>
-              {["아이디", "성명", "구분", "휴대폰", "등급", "관리 권한", "가입일"].map((title) => (
+              {["아이디", "성명", "구분", "휴대폰", "등급", "가입일"].map((title) => (
                 <th key={title} scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
                   {title}
                 </th>
@@ -335,7 +337,7 @@ export default function AdminMembersPage() {
           <tbody>
             {members.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-zinc-600 dark:text-zinc-400">
+                <td colSpan={6} className="px-3 py-6 text-center text-zinc-600 dark:text-zinc-400">
                   {isSearching ? "조건에 맞는 회원이 없습니다." : "회원이 없습니다."}
                 </td>
               </tr>
@@ -366,7 +368,6 @@ export default function AdminMembersPage() {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">{member.phone || "-"}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{tierNameOf(member)}</td>
-                  <td className="px-3 py-2">{scopesOf(member)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{formatJoinedAt(member.joinedAt)}</td>
                 </tr>
               );
