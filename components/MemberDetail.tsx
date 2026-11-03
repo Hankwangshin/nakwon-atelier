@@ -36,38 +36,74 @@ interface MemberDetailProps {
   isSaving: boolean;
   // 저장 결과 안내. 저장 버튼 가까이에 보여 준다.
   notice: React.ReactNode;
+  // 수정 중인지 부모에게 알려, 다른 행을 고를 때 확인을 받게 한다.
+  onEditingChange: (isEditing: boolean) => void;
   onSave: (changes: MemberChanges) => void;
   onWithdraw: () => void;
 }
 
 const INPUT_CLASS =
   "rounded-lg border border-zinc-300 bg-transparent px-2 py-1 disabled:opacity-60 dark:border-zinc-700";
+const BUTTON_CLASS =
+  "rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900";
 
 export function formatJoinedAt(joinedAt: string) {
   return new Date(joinedAt).toLocaleDateString("ko-KR");
 }
 
-// 표에서 고른 회원의 상세 정보. 부모가 회원이 바뀌거나 저장될 때 key를 바꿔
-// 입력칸을 새 값으로 다시 채운다.
+function Field({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`flex flex-col gap-1 ${wide ? "sm:col-span-2 xl:col-span-3" : ""}`}>
+      <dt className="text-zinc-600 dark:text-zinc-400">{label}</dt>
+      <dd className="break-all">{value || "-"}</dd>
+    </div>
+  );
+}
+
+// 표에서 고른 회원의 상세 정보. 처음에는 값만 보여 주고, 수정 버튼을 누르면
+// 입력칸이 열린다. 부모가 회원이 바뀌거나 저장될 때 key를 바꿔 처음 상태로 되돌린다.
 export default function MemberDetail({
   member,
   tierId,
   tiers,
   isSaving,
   notice,
+  onEditingChange,
   onSave,
   onWithdraw,
 }: MemberDetailProps) {
-  const [form, setForm] = useState<MemberChanges>({
+  const saved: MemberChanges = {
     name: member.name,
     phone: member.phone,
     address: member.address,
     shippingAddress: member.shippingAddress,
     tierId,
     adminScopes: member.adminScopes,
-  });
+  };
+  const [form, setForm] = useState<MemberChanges>(saved);
+  const [isEditing, setIsEditing] = useState(false);
   // 전체 관리자와 본인 계정은 서버에서도 막으므로 화면에서도 고칠 수 없게 둔다.
   const isLocked = member.isAdmin || member.isSelf;
+
+  const tierLabel = (id: string) => {
+    const tier = tiers.find((item) => item.id === id);
+    return tier ? `${tier.name} (${tier.discountPercent}%)` : "-";
+  };
+  const scopeLabel = member.isAdmin
+    ? "모든 관리 권한"
+    : ADMIN_SCOPES.filter(({ id }) => member.adminScopes.includes(id))
+        .map(({ label }) => label)
+        .join(", ") || "없음";
+
+  function changeEditing(next: boolean) {
+    setIsEditing(next);
+    onEditingChange(next);
+  }
+
+  function handleCancel() {
+    setForm(saved);
+    changeEditing(false);
+  }
 
   function toggleScope(scope: AdminScope) {
     setForm({
@@ -93,6 +129,7 @@ export default function MemberDetail({
         {member.isAdmin && (
           <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">전체 관리자</span>
         )}
+        {isEditing && <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">수정 중</span>}
       </h2>
       {isLocked && (
         <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
@@ -102,71 +139,103 @@ export default function MemberDetail({
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-3">
-        <fieldset disabled={isLocked || isSaving} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <legend className="sr-only">{member.name} 회원 정보 수정</legend>
-          <p className="flex flex-col gap-1">
-            <span>아이디 (로그인 이메일, 바꿀 수 없음)</span>
-            <span className="break-all py-1">{member.email}</span>
-          </p>
-          <p className="flex flex-col gap-1">
-            <span>가입일</span>
-            <span className="py-1">{formatJoinedAt(member.joinedAt)}</span>
-          </p>
-          <label className="flex flex-col gap-1">
-            성명
-            <input
-              required
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              className={INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            휴대폰 (예: 010-1234-5678)
-            <input
-              required
-              type="tel"
-              value={form.phone}
-              onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              className={INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            등급
-            <select
-              value={form.tierId}
-              onChange={(event) => setForm({ ...form, tierId: event.target.value })}
-              className={INPUT_CLASS}
+      {!isEditing ? (
+        <>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Field label="아이디 (로그인 이메일)" value={member.email} />
+            <Field label="가입일" value={formatJoinedAt(member.joinedAt)} />
+            <Field label="성명" value={member.name} />
+            <Field label="휴대폰" value={member.phone} />
+            <Field label="등급" value={tierLabel(tierId)} />
+            <Field label="관리 권한" value={scopeLabel} />
+            <Field label="주소지" value={member.address} wide />
+            <Field label="배송지" value={member.shippingAddress} wide />
+          </dl>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => changeEditing(true)}
+              disabled={isLocked}
+              className={BUTTON_CLASS}
             >
-              {tiers.map(({ id, name, discountPercent }) => (
-                <option key={id} value={id}>
-                  {name} ({discountPercent}%)
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
-            주소지
-            <input
-              maxLength={MAX_ADDRESS_LENGTH}
-              value={form.address}
-              onChange={(event) => setForm({ ...form, address: event.target.value })}
-              className={INPUT_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
-            배송지
-            <input
-              maxLength={MAX_ADDRESS_LENGTH}
-              value={form.shippingAddress}
-              onChange={(event) => setForm({ ...form, shippingAddress: event.target.value })}
-              className={INPUT_CLASS}
-            />
-          </label>
-          {member.isAdmin ? (
-            <p className="sm:col-span-2 xl:col-span-3">관리 권한: 모든 관리 권한이 있습니다.</p>
-          ) : (
+              수정
+            </button>
+            {!isLocked && (
+              <button
+                type="button"
+                onClick={onWithdraw}
+                className="text-red-600 underline dark:text-red-400"
+              >
+                탈퇴 처리
+              </button>
+            )}
+          </div>
+          {notice}
+        </>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-3">
+          <fieldset disabled={isSaving} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <legend className="sr-only">{member.name} 회원 정보 수정</legend>
+            <p className="flex flex-col gap-1">
+              <span>아이디 (로그인 이메일, 바꿀 수 없음)</span>
+              <span className="break-all py-1">{member.email}</span>
+            </p>
+            <p className="flex flex-col gap-1">
+              <span>가입일</span>
+              <span className="py-1">{formatJoinedAt(member.joinedAt)}</span>
+            </p>
+            <label className="flex flex-col gap-1">
+              성명
+              <input
+                required
+                autoFocus
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              휴대폰 (예: 010-1234-5678)
+              <input
+                required
+                type="tel"
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              등급
+              <select
+                value={form.tierId}
+                onChange={(event) => setForm({ ...form, tierId: event.target.value })}
+                className={INPUT_CLASS}
+              >
+                {tiers.map(({ id, name, discountPercent }) => (
+                  <option key={id} value={id}>
+                    {name} ({discountPercent}%)
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
+              주소지
+              <input
+                maxLength={MAX_ADDRESS_LENGTH}
+                value={form.address}
+                onChange={(event) => setForm({ ...form, address: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-2 xl:col-span-3">
+              배송지
+              <input
+                maxLength={MAX_ADDRESS_LENGTH}
+                value={form.shippingAddress}
+                onChange={(event) => setForm({ ...form, shippingAddress: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
             <fieldset className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-3">
               <legend className="mb-1">관리 권한</legend>
               {ADMIN_SCOPES.map(({ id, label }) => (
@@ -180,30 +249,24 @@ export default function MemberDetail({
                 </label>
               ))}
             </fieldset>
-          )}
-        </fieldset>
+          </fieldset>
 
-        {!isLocked && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-            >
+            <button type="submit" disabled={isSaving} className={BUTTON_CLASS}>
               {isSaving ? "저장하는 중" : "저장"}
             </button>
             <button
               type="button"
-              onClick={onWithdraw}
+              onClick={handleCancel}
               disabled={isSaving}
-              className="text-red-600 underline disabled:opacity-50 dark:text-red-400"
+              className="underline disabled:opacity-50"
             >
-              탈퇴 처리
+              취소
             </button>
           </div>
-        )}
-        {notice}
-      </form>
+          {notice}
+        </form>
+      )}
     </section>
   );
 }

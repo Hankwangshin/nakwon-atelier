@@ -41,6 +41,8 @@ export default function AdminMembersPage() {
   const [savedCount, setSavedCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  // 상세에서 수정 중인지. 다른 행으로 옮길 때 확인을 받는다.
+  const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -108,6 +110,13 @@ export default function AdminMembersPage() {
   }
 
   function selectMember(member: Member) {
+    if (member.id === selectedId) {
+      return;
+    }
+    if (isEditing && !window.confirm("수정 중인 내용을 저장하지 않고 다른 회원을 볼까요?")) {
+      return;
+    }
+    setIsEditing(false);
     setSelectedId(member.id);
     setMessage("");
     setError("");
@@ -137,6 +146,8 @@ export default function AdminMembersPage() {
     }
     setError("");
     await loadMembers(search);
+    // 상세를 저장된 값으로 다시 그리고 읽기 전용으로 돌린다.
+    setIsEditing(false);
     setSavedCount((count) => count + 1);
     setMessage(`${changes.name.trim()} 회원의 정보를 저장했습니다.`);
   }
@@ -147,6 +158,7 @@ export default function AdminMembersPage() {
     setDraft(EMPTY_SEARCH);
     setSearch(EMPTY_SEARCH);
     await loadMembers(EMPTY_SEARCH);
+    setIsEditing(false);
     setSelectedId(id);
     setSavedCount((count) => count + 1);
     setMessage(`${name} 회원을 등록했습니다.`);
@@ -332,6 +344,7 @@ export default function AdminMembersPage() {
           tierId={tierIdOf(selected)}
           tiers={tiers}
           isSaving={isSaving}
+          onEditingChange={setIsEditing}
           notice={notice}
           onSave={(changes) => handleSave(selected, changes)}
           onWithdraw={() => handleWithdraw(selected)}
