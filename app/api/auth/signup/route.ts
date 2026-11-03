@@ -1,9 +1,10 @@
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
-import { findAddressesProblem, findProfileProblem } from "@/lib/member-input";
+import {
+  findAccountProblem,
+  findAddressesProblem,
+  findProfileProblem,
+} from "@/lib/member-input";
 import { createAdminClient, createUserClient } from "@/lib/supabase";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
 
 function findInputProblem(body: Record<string, unknown>): string | null {
   const {
@@ -18,11 +19,9 @@ function findInputProblem(body: Record<string, unknown>): string | null {
     agreePrivacy,
   } = body;
 
-  if (typeof email !== "string" || !EMAIL_PATTERN.test(email)) {
-    return "이메일 형식을 확인해 주세요.";
-  }
-  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
-    return `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상 입력해 주세요.`;
+  const accountProblem = findAccountProblem(email, password);
+  if (accountProblem) {
+    return accountProblem;
   }
   const profileProblem = findProfileProblem(name, phone);
   if (profileProblem) {

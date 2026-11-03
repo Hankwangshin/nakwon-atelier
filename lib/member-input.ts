@@ -1,6 +1,19 @@
 import { MAX_ADDRESS_LENGTH } from "@/lib/limits";
 
 const PHONE_PATTERN = /^01\d-?\d{3,4}-?\d{4}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const MIN_PASSWORD_LENGTH = 8;
+
+// 회원가입과 관리자의 회원 추가가 같은 기준으로 이메일과 비밀번호를 검사한다.
+export function findAccountProblem(email: unknown, password: unknown): string | null {
+  if (typeof email !== "string" || !EMAIL_PATTERN.test(email)) {
+    return "이메일 형식을 확인해 주세요.";
+  }
+  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+    return `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상 입력해 주세요.`;
+  }
+  return null;
+}
 
 // 회원가입과 내 정보 수정이 같은 기준으로 검사하도록 한곳에 둔다.
 export function findProfileProblem(name: unknown, phone: unknown): string | null {

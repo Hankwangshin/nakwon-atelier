@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import MemberCreateForm from "@/components/MemberCreateForm";
 import MemberDetail, { formatJoinedAt } from "@/components/MemberDetail";
 import type { Member, MemberChanges } from "@/components/MemberDetail";
 import TierManager from "@/components/TierManager";
@@ -39,6 +40,7 @@ export default function AdminMembersPage() {
   // 저장할 때마다 늘려 상세 입력칸을 저장된 값으로 다시 채운다.
   const [savedCount, setSavedCount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -139,6 +141,21 @@ export default function AdminMembersPage() {
     setMessage(`${changes.name.trim()} 회원의 정보를 저장했습니다.`);
   }
 
+  // 새 회원이 바로 보이도록 검색을 풀고 다시 불러온 뒤 그 회원을 고른다.
+  async function handleCreated(id: string, name: string) {
+    setIsCreating(false);
+    setDraft(EMPTY_SEARCH);
+    setSearch(EMPTY_SEARCH);
+    await loadMembers(EMPTY_SEARCH);
+    setSelectedId(id);
+    setSavedCount((count) => count + 1);
+    setMessage(`${name} 회원을 등록했습니다.`);
+    // 화면이 그려진 뒤 아래 상세 정보가 보이게 내린다.
+    requestAnimationFrame(() => {
+      document.getElementById("member-detail-title")?.scrollIntoView({ block: "start" });
+    });
+  }
+
   async function handleWithdraw(member: Member) {
     const isConfirmed = window.confirm(
       `${member.name}(${member.email}) 회원을 탈퇴 처리할까요? 회원 정보와 장바구니가 삭제되고 되돌릴 수 없습니다. 주문 기록은 법에 따라 보관됩니다.`,
@@ -182,7 +199,25 @@ export default function AdminMembersPage() {
 
   return (
     <main className="mx-auto w-full page-wide px-4 py-6 text-sm">
-      <h1 className="text-xl font-semibold">회원 관리</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">회원 관리</h1>
+        {!isCreating && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsCreating(true);
+              setMessage("");
+            }}
+            className="rounded-lg bg-zinc-900 px-4 py-1.5 text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            회원 추가
+          </button>
+        )}
+      </div>
+
+      {isCreating && (
+        <MemberCreateForm onCreated={handleCreated} onCancel={() => setIsCreating(false)} />
+      )}
 
       <TierManager tiers={tiers} onChanged={loadTiers} />
 

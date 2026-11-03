@@ -378,6 +378,24 @@ try {
   check("없는 검색 조건 거절", (await manager("/api/admin/members?field=phone&q=010")).status === 400);
   check("51자 검색어 거절", (await manager(`/api/admin/members?field=all&q=${"가".repeat(51)}`)).status === 400);
   check("일반 회원 검색 거절", (await userB("/api/admin/members?field=all&q=a")).status === 403);
+  // 관리자의 회원 추가
+  const created = { ...newAccount(), name: "추가한 회원", consentConfirmed: true };
+  check("일반 회원 회원 추가 거절", (await userB("/api/admin/members", "POST", created)).status === 403);
+  check("비회원 회원 추가 거절", (await guest("/api/admin/members", "POST", created)).status === 401);
+  check("동의 확인 없으면 추가 거절", (await manager("/api/admin/members", "POST", { ...created, consentConfirmed: false })).body?.error?.code === "CONSENT_REQUIRED");
+  check("짧은 첫 비밀번호 거절", (await manager("/api/admin/members", "POST", { ...created, password: "short" })).status === 400);
+  check("이메일 형식 거절", (await manager("/api/admin/members", "POST", { ...created, email: "not-email" })).status === 400);
+  check("휴대폰 형식 거절(추가)", (await manager("/api/admin/members", "POST", { ...created, phone: "1234" })).status === 400);
+  check("빈 주소지 거절(추가)", (await manager("/api/admin/members", "POST", { ...created, address: " " })).status === 400);
+  check("이미 가입한 이메일 거절", (await manager("/api/admin/members", "POST", { ...created, email: accountA.email })).status === 409);
+  const createdRes = await manager("/api/admin/members", "POST", { ...created, isAdmin: true, adminScopes: ["members"] });
+  check("관리자가 회원 추가", createdRes.status === 201 && Boolean(createdRes.body?.id));
+  if (createdRes.body?.id) createdIds.push(createdRes.body.id);
+  const createdRow = (await admin.from("profiles").select("name, is_admin, tier_id, admin_scopes, agreed_terms_at, agreed_privacy_at").eq("id", createdRes.body?.id).single()).data;
+  check("추가한 회원은 기본 등급·권한 없음·동의 시각 저장", createdRow?.is_admin === false && createdRow.tier_id === null && createdRow.admin_scopes.length === 0 && Boolean(createdRow.agreed_terms_at && createdRow.agreed_privacy_at));
+  check("추가한 회원이 목록에 보임", (await searchNames("email", created.email)).includes(createdRes.body?.id));
+  check("추가한 회원이 첫 비밀번호로 로그인", (await createBrowser()("/api/auth/login", "POST", { email: created.email, password: created.password })).status === 200);
+
   const memberEdit = { tierId: defaultTier.id, adminScopes: [], name: "관리자가 고친 이름", phone: "010-3333-4444", address: "고친 주소지", shippingAddress: "" };
   check("관리자 수정 시 휴대폰 형식 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, phone: "1234" })).status === 400);
   check("관리자 수정 시 빈 성명 거절", (await manager(memberUrl(me.id), "PATCH", { ...memberEdit, name: " " })).status === 400);
