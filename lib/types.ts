@@ -5,11 +5,16 @@ export interface Product {
   image: string; // 일러스트 경로 또는 업로드한 사진 주소
   category: string; // 진열 분류 (lib/categories.ts)
   price: number; // 가격(원)
-  stock: number; // 재고 수량
+  stock: number; // 재고수량 (지금 판매 가능한 수량)
   shipping: string; // 배송 안내
   features: string; // 특징
   recommendedFor: string[]; // 추천 대상
   basisDate: string; // 기준일 (YYYY-MM-DD)
+}
+
+// 관리자 화면에서만 쓴다. 보유수량은 고객 화면과 챗봇에 보내지 않는다.
+export interface AdminProduct extends Product {
+  onHand: number; // 보유수량 (입고 총량)
 }
 
 // Design Ref: §5 — 쇼핑몰 이용 안내 문서 1개

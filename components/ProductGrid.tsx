@@ -25,6 +25,9 @@ export default function ProductGrid({ products }: ProductGridProps) {
           <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
             {product.shipping}
           </p>
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+            재고 {product.stock.toLocaleString("ko-KR")}개
+          </p>
           <AddToCartButton
             productId={product.id}
             isSoldOut={product.stock === 0}

@@ -6,13 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 import { CATEGORIES } from "@/lib/categories";
 import { callApi, formatPrice } from "@/lib/client-api";
 import { PRODUCT_IMAGES, PRODUCT_RECIPIENTS } from "@/lib/product-options";
-import type { Product } from "@/lib/types";
+import type { AdminProduct } from "@/lib/types";
 
 interface FormState {
   name: string;
   image: string;
   category: string;
   price: string;
+  onHand: string;
   stock: string;
   shipping: string;
   features: string;
@@ -24,6 +25,7 @@ const EMPTY_FORM: FormState = {
   image: PRODUCT_IMAGES[0].path,
   category: CATEGORIES[0].id,
   price: "",
+  onHand: "",
   stock: "",
   shipping: "배송비 3,000원, 2~3일 소요",
   features: "",
@@ -39,7 +41,7 @@ const INPUT_CLASS =
 export default function AdminProductsPage() {
   const router = useRouter();
   const [isAllowed, setIsAllowed] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -48,7 +50,7 @@ export default function AdminProductsPage() {
   const [newUpload, setNewUpload] = useState<string | null>(null);
 
   const loadProducts = useCallback(async () => {
-    const result = await callApi<{ products: Product[] }>("/api/products");
+    const result = await callApi<{ products: AdminProduct[] }>("/api/admin/products");
     setProducts(result.data?.products ?? []);
   }, []);
 
@@ -63,7 +65,7 @@ export default function AdminProductsPage() {
     });
   }, [router, loadProducts]);
 
-  function startEdit(product: Product) {
+  function startEdit(product: AdminProduct) {
     discardUpload(newUpload);
     setNewUpload(null);
     setEditingId(product.id);
@@ -72,6 +74,7 @@ export default function AdminProductsPage() {
       image: product.image,
       category: product.category,
       price: String(product.price),
+      onHand: String(product.onHand),
       stock: String(product.stock),
       shipping: product.shipping,
       features: product.features,
@@ -145,6 +148,7 @@ export default function AdminProductsPage() {
     const body = {
       ...form,
       price: Number(form.price),
+      onHand: Number(form.onHand),
       stock: Number(form.stock),
     };
     const result = editingId
@@ -160,7 +164,7 @@ export default function AdminProductsPage() {
     await loadProducts();
   }
 
-  async function handleDelete(product: Product) {
+  async function handleDelete(product: AdminProduct) {
     if (!window.confirm(`"${product.name}"을(를) 삭제할까요? 되돌릴 수 없습니다.`)) {
       return;
     }
@@ -227,12 +231,16 @@ export default function AdminProductsPage() {
             </label>
           </div>
         </div>
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 sm:col-span-2">
           가격(원)
           <input required type="number" min={1} value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} className={INPUT_CLASS} />
         </label>
         <label className="flex flex-col gap-1">
-          재고
+          보유수량 (입고 총량)
+          <input required type="number" min={0} value={form.onHand} onChange={(event) => setForm({ ...form, onHand: event.target.value })} className={INPUT_CLASS} />
+        </label>
+        <label className="flex flex-col gap-1">
+          재고수량 (판매 가능, 결제되면 자동으로 줄어듦)
           <input required type="number" min={0} value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} className={INPUT_CLASS} />
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
@@ -282,7 +290,7 @@ export default function AdminProductsPage() {
             <div className="min-w-40 flex-1">
               <p className="font-medium">{product.name}</p>
               <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                {formatPrice(product.price)} · 재고 {product.stock}개
+                {formatPrice(product.price)} · 보유 {product.onHand}개 · 재고 {product.stock}개
               </p>
             </div>
             <button type="button" onClick={() => startEdit(product)} className="underline">

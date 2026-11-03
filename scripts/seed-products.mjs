@@ -19,6 +19,7 @@ const products = JSON.parse(
 const { error } = await admin.from("products").upsert(
   products.map(({ recommendedFor, basisDate, ...product }) => ({
     ...product,
+    on_hand: product.stock,
     category: CATEGORIES.find(({ images }) =>
       images.some((name) => product.image === `/products/${name}.svg`),
     ).id,

@@ -36,6 +36,9 @@ yarn-error.log*
 # 사용자가 직접 확인 후 삭제할 파일 보관 폴더
 /trash-can/
 
+# supabase CLI 연결 정보
+/supabase/.temp/
+
 # vercel
 .vercel
 

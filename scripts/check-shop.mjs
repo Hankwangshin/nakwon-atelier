@@ -125,14 +125,17 @@ try {
   const confirm = (browser, body) => browser("/api/payments/confirm", "POST", body);
   check("다른 회원은 승인 불가", (await confirm(userB, { paymentKey: "fake", orderId: orderNumber, amount })).status === 404);
   check("금액을 바꾸면 승인 거절", (await confirm(userA, { paymentKey: "fake", orderId: orderNumber, amount: 100 })).body?.error?.code === "AMOUNT_MISMATCH");
+  const stockOf = async (id) => (await admin.from("products").select("stock, on_hand").eq("id", id).single()).data;
+  const stockBeforeFailure = (await stockOf("p01")).stock;
   const fake = await confirm(userA, { paymentKey: "fake", orderId: orderNumber, amount });
   check("가짜 결제 키는 결제대행사가 거절", fake.body?.error?.code === "PAYMENT_FAILED");
+  check("결제 실패 시 재고가 그대로", (await stockOf("p01")).stock === stockBeforeFailure);
   check("실패한 주문은 다시 승인 불가", (await confirm(userA, { paymentKey: "fake", orderId: orderNumber, amount })).status === 409);
   check("실패한 주문은 주문 내역에 없음", (await userA("/api/orders")).body.orders.length === 0);
   check("결제 실패 시 장바구니 유지", (await userA("/api/cart")).body.lines.length === 1);
 
   // 상품 관리
-  const sample = { name: "점검용 상품", image: "/products/pen.svg", category: "pen", price: 1234, stock: 5, shipping: "배송비 3,000원, 2~3일 소요", features: "점검용 설명입니다.", recommendedFor: ["친구"] };
+  const sample = { name: "점검용 상품", image: "/products/pen.svg", category: "pen", price: 1234, onHand: 5, stock: 5, shipping: "배송비 3,000원, 2~3일 소요", features: "점검용 설명입니다.", recommendedFor: ["친구"] };
   check("비회원 상품 추가 거절", (await guest("/api/products", "POST", sample)).status === 401);
   check("일반 회원 상품 추가 거절", (await userA("/api/products", "POST", sample)).status === 403);
   check("일반 회원 상품 수정 거절", (await userA("/api/products/p01", "PATCH", sample)).status === 403);
@@ -204,6 +207,54 @@ try {
   check("상품 수정", (await manager(`/api/products/${newId}`, "PATCH", { ...sample, image: secondPhoto, price: 2000, features: "수정한 설명입니다." })).status === 200);
   check("수정한 가격이 장바구니에 바로 반영", (await userB("/api/cart")).body.itemsAmount === 2000);
   check("없는 상품 수정은 404", (await manager("/api/products/nope", "PATCH", sample)).status === 404);
+
+  // 재고 관리
+  const stockInput = { ...sample, image: secondPhoto, price: 2000 };
+  check("재고수량이 보유수량보다 크면 거절", (await manager(`/api/products/${newId}`, "PATCH", { ...stockInput, stock: 6 })).status === 400);
+  check("보유수량 없으면 거절", (await manager(`/api/products/${newId}`, "PATCH", { ...stockInput, onHand: undefined })).status === 400);
+  check("공개 목록에 보유수량이 없음", !("onHand" in (await guest("/api/products")).body.products[0]));
+  check("비회원 보유수량 조회 거절", (await guest("/api/admin/products")).status === 401);
+  check("일반 회원 보유수량 조회 거절", (await userB("/api/admin/products")).status === 403);
+  check("관리자는 보유수량을 봄", (await manager("/api/admin/products")).body?.products?.find(({ id }) => id === newId)?.onHand === 5);
+  const { error: anonOnHand } = await anon.from("products").select("on_hand").limit(1);
+  check("공개 키로 보유수량을 볼 수 없음", Boolean(anonOnHand));
+
+  const makeStockOrder = async (quantity) => {
+    const { data } = await admin.from("orders").insert({ order_number: `order_check_${randomBytes(6).toString("hex")}`, user_id: meB.id, order_name: "재고 점검", items_amount: 1000, shipping_fee: 0, amount: 1000, receiver_name: "시험 회원", receiver_phone: "010-0000-0000", address: "샘플 주소" }).select("id").single();
+    await admin.from("order_items").insert({ order_id: data.id, product_id: newId, name: "점검용 상품", price: 1000, quantity });
+    return data.id;
+  };
+  const deduct = (id, client = admin) => client.rpc("deduct_order_stock", { target_order: id });
+  const restore = (id) => admin.rpc("restore_order_stock", { target_order: id });
+
+  const stockOrder = await makeStockOrder(2);
+  check("공개 키로 재고를 줄일 수 없음", Boolean((await deduct(stockOrder, anon)).error));
+  check("공개 키로 재고가 줄지 않음", (await stockOf(newId)).stock === 5);
+  check("결제 시 재고 차감", (await deduct(stockOrder)).data === true && (await stockOf(newId)).stock === 3);
+  await deduct(stockOrder);
+  check("같은 주문은 두 번 차감하지 않음", (await stockOf(newId)).stock === 3);
+  const tooMany = await makeStockOrder(4);
+  check("재고보다 많으면 차감 거절", (await deduct(tooMany)).data === false);
+  const { data: untouched } = await admin.from("orders").select("stock_deducted").eq("id", tooMany).single();
+  check("차감 거절 시 아무것도 바뀌지 않음", (await stockOf(newId)).stock === 3 && untouched.stock_deducted === false);
+  await restore(tooMany);
+  check("차감하지 않은 주문은 복구하지 않음", (await stockOf(newId)).stock === 3);
+  await restore(stockOrder);
+  check("취소 시 재고 복구", (await stockOf(newId)).stock === 5);
+  await restore(stockOrder);
+  check("같은 주문은 두 번 복구하지 않음", (await stockOf(newId)).stock === 5);
+  await deduct(stockOrder);
+  check("보유수량을 줄임", (await manager(`/api/products/${newId}`, "PATCH", { ...stockInput, onHand: 4, stock: 3 })).status === 200);
+  await restore(stockOrder);
+  check("복구는 보유수량을 넘지 않음", (await stockOf(newId)).stock === 4);
+
+  const raced = await userB("/api/orders", "POST", shipping);
+  await admin.from("products").update({ stock: 0 }).eq("id", newId);
+  const soldOut = await confirm(userB, { paymentKey: "fake", orderId: raced.body.orderNumber, amount: raced.body.amount });
+  check("승인 직전 품절이면 결제 진행 안 함", soldOut.body?.error?.code === "OUT_OF_STOCK");
+  const { data: racedOrder } = await admin.from("orders").select("status").eq("order_number", raced.body.orderNumber).single();
+  check("재고 부족 주문은 실패 처리", racedOrder.status === "failed");
+
   check("상품 삭제", (await manager(`/api/products/${newId}`, "DELETE")).status === 200);
   check("삭제한 상품의 사진도 저장소에서 삭제", !(await isStored(secondPhoto)));
   check("삭제한 상품은 공개 목록에서 사라짐", !(await guest("/api/products")).body.products.some(({ id }) => id === newId));

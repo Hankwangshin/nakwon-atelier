@@ -52,6 +52,23 @@ export async function POST(request: Request) {
     return errorResponse("AMOUNT_MISMATCH", "결제 금액이 주문 금액과 다릅니다.", 400);
   }
 
+  // 승인 전에 재고부터 줄여, 마지막 상품을 두 사람이 동시에 결제해도 한 명만 성공한다.
+  const { data: hasStock, error: stockError } = await admin.rpc("deduct_order_stock", {
+    target_order: order.id,
+  });
+  if (stockError) {
+    logFailure("stock deduct failed", stockError);
+    return serverFailedResponse();
+  }
+  if (!hasStock) {
+    await admin.from("orders").update({ status: "failed" }).eq("id", order.id);
+    return errorResponse(
+      "OUT_OF_STOCK",
+      "재고가 부족해 결제를 진행하지 않았습니다. 장바구니를 다시 확인해 주세요.",
+      409,
+    );
+  }
+
   const credentials = Buffer.from(`${process.env.TOSS_SECRET_KEY}:`).toString("base64");
   let response: Response;
   try {
@@ -77,6 +94,12 @@ export async function POST(request: Request) {
   if (!response.ok) {
     logFailure("payment failed", { code: result?.code });
     await admin.from("orders").update({ status: "failed" }).eq("id", order.id);
+    const { error: restoreError } = await admin.rpc("restore_order_stock", {
+      target_order: order.id,
+    });
+    if (restoreError) {
+      logFailure("stock restore failed", restoreError);
+    }
     return errorResponse(
       "PAYMENT_FAILED",
       result?.message ?? "결제를 완료하지 못했습니다.",

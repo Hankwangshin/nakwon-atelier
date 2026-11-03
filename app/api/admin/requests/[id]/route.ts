@@ -69,6 +69,14 @@ async function approveCancel(
     return serverFailedResponse();
   }
 
+  // 결제는 이미 취소됐으므로 재고 복구가 실패해도 승인은 끝낸다. 재고는 상품 관리에서 고칠 수 있다.
+  const { error: restoreError } = await admin.rpc("restore_order_stock", {
+    target_order: order.id,
+  });
+  if (restoreError) {
+    logFailure("stock restore failed", restoreError);
+  }
+
   await finishRequest(admin, request.id, "approved");
   return Response.json({ ok: true });
 }
