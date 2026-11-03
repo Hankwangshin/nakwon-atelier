@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import AddressFields from "@/components/AddressFields";
 import TextField from "@/components/TextField";
 import { callApi } from "@/lib/client-api";
 
@@ -9,7 +10,11 @@ interface User {
   email?: string;
   name?: string;
   phone?: string;
+  address?: string;
+  shippingAddress?: string;
 }
+
+type EditableUser = Required<Pick<User, "name" | "phone" | "address" | "shippingAddress">>;
 
 interface Me {
   user: User | null;
@@ -17,7 +22,7 @@ interface Me {
 
 interface AccountEditFormProps {
   user: User;
-  onSaved: (name: string, phone: string) => void;
+  onSaved: (saved: EditableUser) => void;
   onCancel: () => void;
 }
 
@@ -25,6 +30,11 @@ interface AccountEditFormProps {
 function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
   const [name, setName] = useState(user.name ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
+  const [address, setAddress] = useState(user.address ?? "");
+  const [shippingAddress, setShippingAddress] = useState(user.shippingAddress ?? "");
+  const [isSameAsAddress, setIsSameAsAddress] = useState(
+    (user.shippingAddress ?? "") === (user.address ?? ""),
+  );
   const [password, setPassword] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -39,12 +49,18 @@ function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
 
     setError("");
     setIsSending(true);
-    const result = await callApi("/api/auth/me", "PATCH", { name, phone, password });
+    const saved = {
+      name: name.trim(),
+      phone,
+      address: address.trim(),
+      shippingAddress: (isSameAsAddress ? address : shippingAddress).trim(),
+    };
+    const result = await callApi("/api/auth/me", "PATCH", { ...saved, password });
     setIsSending(false);
     setPassword("");
 
     if (result.ok) {
-      onSaved(name.trim(), phone);
+      onSaved(saved);
     } else {
       setError(result.errorMessage);
     }
@@ -55,6 +71,14 @@ function AccountEditForm({ user, onSaved, onCancel }: AccountEditFormProps) {
       <p>이메일 {user.email} (바꿀 수 없습니다)</p>
       <TextField label="이름" value={name} onChange={setName} autoComplete="name" />
       <TextField label="휴대폰 번호" type="tel" value={phone} onChange={setPhone} autoComplete="tel" placeholder="010-0000-0000" />
+      <AddressFields
+        address={address}
+        onAddressChange={setAddress}
+        shippingAddress={shippingAddress}
+        onShippingAddressChange={setShippingAddress}
+        isSameAsAddress={isSameAsAddress}
+        onSameAsAddressChange={setIsSameAsAddress}
+      />
       {isConfirming && (
         <TextField label="비밀번호를 한 번 더 입력해 주세요" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
       )}
@@ -122,8 +146,8 @@ export default function AccountPage() {
       {user && isEditing && (
         <AccountEditForm
           user={user}
-          onSaved={(name, phone) => {
-            setUser({ ...user, name, phone });
+          onSaved={(saved) => {
+            setUser({ ...user, ...saved });
             setIsEditing(false);
             setMessage("내 정보를 수정했습니다.");
           }}
@@ -138,6 +162,15 @@ export default function AccountPage() {
           <dd>{user.name}</dd>
           <dt className="text-zinc-600 dark:text-zinc-400">휴대폰 번호</dt>
           <dd>{user.phone}</dd>
+          <dt className="text-zinc-600 dark:text-zinc-400">주소지</dt>
+          <dd>{user.address || "아직 없습니다"}</dd>
+          <dt className="text-zinc-600 dark:text-zinc-400">배송지</dt>
+          <dd>
+            {user.shippingAddress || "아직 없습니다"}
+            {user.shippingAddress && user.shippingAddress === user.address && (
+              <span className="text-zinc-600 dark:text-zinc-400"> (주소지와 같음)</span>
+            )}
+          </dd>
         </dl>
       )}
       {user && !isEditing && (

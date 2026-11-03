@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import AddressFields from "@/components/AddressFields";
 import TextField from "@/components/TextField";
 import { callApi } from "@/lib/client-api";
 
@@ -12,6 +13,9 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [isSameAsAddress, setIsSameAsAddress] = useState(true);
   const [isOver14, setIsOver14] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
@@ -30,6 +34,8 @@ export default function SignupPage() {
       password,
       name,
       phone,
+      address,
+      shippingAddress: isSameAsAddress ? address : shippingAddress,
       isOver14,
       agreeTerms,
       agreePrivacy,
@@ -51,6 +57,14 @@ export default function SignupPage() {
         <TextField label="비밀번호 (8자 이상)" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
         <TextField label="이름" value={name} onChange={setName} autoComplete="name" />
         <TextField label="휴대폰 번호" type="tel" value={phone} onChange={setPhone} autoComplete="tel" placeholder="010-0000-0000" />
+        <AddressFields
+          address={address}
+          onAddressChange={setAddress}
+          shippingAddress={shippingAddress}
+          onShippingAddressChange={setShippingAddress}
+          isSameAsAddress={isSameAsAddress}
+          onSameAsAddressChange={setIsSameAsAddress}
+        />
 
         <fieldset className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
           <legend className="px-1 font-medium">필수 동의</legend>
@@ -67,7 +81,7 @@ export default function SignupPage() {
             <span>
               개인정보 수집·이용에 동의합니다.
               <span className="mt-1 block text-xs text-zinc-600 dark:text-zinc-400">
-                수집 항목: 이메일, 이름, 휴대폰 번호, 배송지 주소. 이용 목적: 회원 관리, 주문 처리, 배송, 문의 응대.
+                수집 항목: 이메일, 이름, 휴대폰 번호, 주소지, 배송지 주소.이용 목적: 회원 관리, 주문 처리, 배송, 문의 응대.
                 보유 기간: 회원 탈퇴 시까지. 다만 거래 기록은 전자상거래법에 따라 보관합니다.
                 동의를 거부할 수 있으나, 거부하면 회원가입을 할 수 없습니다.
               </span>

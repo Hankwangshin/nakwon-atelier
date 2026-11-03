@@ -6,6 +6,7 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
+import { findAddressProblem } from "@/lib/member-input";
 import { getMemberDiscount } from "@/lib/member-tiers";
 import { getProducts } from "@/lib/products";
 import { createAdminClient, createUserClient, getCurrentUser } from "@/lib/supabase";
@@ -50,8 +51,7 @@ export async function POST(request: Request) {
     receiverName.trim() === "" ||
     typeof receiverPhone !== "string" ||
     !PHONE_PATTERN.test(receiverPhone) ||
-    typeof address !== "string" ||
-    address.trim() === ""
+    findAddressProblem(address, "배송지 주소")
   ) {
     return errorResponse("INVALID_INPUT", "배송 정보를 확인해 주세요.", 400);
   }

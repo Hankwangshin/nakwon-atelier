@@ -1,12 +1,22 @@
 import { errorResponse, logFailure, serverFailedResponse } from "@/lib/http";
-import { findProfileProblem } from "@/lib/member-input";
+import { findAddressesProblem, findProfileProblem } from "@/lib/member-input";
 import { createAdminClient, createUserClient } from "@/lib/supabase";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 function findInputProblem(body: Record<string, unknown>): string | null {
-  const { email, password, name, phone, isOver14, agreeTerms, agreePrivacy } = body;
+  const {
+    email,
+    password,
+    name,
+    phone,
+    address,
+    shippingAddress,
+    isOver14,
+    agreeTerms,
+    agreePrivacy,
+  } = body;
 
   if (typeof email !== "string" || !EMAIL_PATTERN.test(email)) {
     return "이메일 형식을 확인해 주세요.";
@@ -17,6 +27,10 @@ function findInputProblem(body: Record<string, unknown>): string | null {
   const profileProblem = findProfileProblem(name, phone);
   if (profileProblem) {
     return profileProblem;
+  }
+  const addressProblem = findAddressesProblem(address, shippingAddress);
+  if (addressProblem) {
+    return addressProblem;
   }
   if (isOver14 !== true) {
     return "만 14세 이상만 가입할 수 있습니다.";
@@ -54,6 +68,8 @@ export async function POST(request: Request) {
     id: data.user.id,
     name: body.name.trim(),
     phone: body.phone,
+    address: body.address.trim(),
+    shipping_address: body.shippingAddress.trim(),
     agreed_terms_at: agreedAt,
     agreed_privacy_at: agreedAt,
   });

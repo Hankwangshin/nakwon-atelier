@@ -17,7 +17,7 @@ interface CreatedOrder {
 }
 
 interface Me {
-  user: { name?: string; phone?: string } | null;
+  user: { name?: string; phone?: string; address?: string; shippingAddress?: string } | null;
 }
 
 const CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY as string;
@@ -40,6 +40,8 @@ export default function CheckoutPage() {
       }
       setReceiverName(data.user.name ?? "");
       setReceiverPhone(data.user.phone ?? "");
+      // 내 정보의 배송지를 먼저 채우고, 없으면 주소지를 쓴다. 이번 주문만 바꿔도 저장된 값은 그대로다.
+      setAddress(data.user.shippingAddress || data.user.address || "");
     });
   }, [router]);
 
@@ -111,7 +113,10 @@ export default function CheckoutPage() {
         <form onSubmit={handleOrder} className="mt-4 flex flex-col gap-3">
           <TextField label="받는 사람" value={receiverName} onChange={setReceiverName} autoComplete="name" />
           <TextField label="휴대폰 번호" type="tel" value={receiverPhone} onChange={setReceiverPhone} autoComplete="tel" placeholder="010-0000-0000" />
-          <TextField label="배송지 주소" value={address} onChange={setAddress} autoComplete="street-address" />
+          <TextField label="배송지 주소" value={address} onChange={setAddress} autoComplete="shipping street-address" />
+          <p className="-mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+            내 정보의 배송지가 미리 채워집니다. 여기서 바꾸면 이번 주문에만 적용됩니다.
+          </p>
           <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white">
             결제 단계로 가기
           </button>

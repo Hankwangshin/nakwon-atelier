@@ -6,7 +6,7 @@ import {
   loginRequiredResponse,
   serverFailedResponse,
 } from "@/lib/http";
-import { findProfileProblem } from "@/lib/member-input";
+import { findAddressesProblem, findProfileProblem } from "@/lib/member-input";
 import {
   createAdminClient,
   createUserClient,
@@ -23,7 +23,7 @@ export async function GET() {
   const supabase = await createUserClient();
   const { data } = await supabase
     .from("profiles")
-    .select("name, phone, is_admin, admin_scopes")
+    .select("name, phone, address, shipping_address, is_admin, admin_scopes")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -34,6 +34,8 @@ export async function GET() {
       email: user.email,
       name: data?.name,
       phone: data?.phone,
+      address: data?.address ?? "",
+      shippingAddress: data?.shipping_address ?? "",
       isAdmin,
       adminScopes: isAdmin ? ALL_ADMIN_SCOPES : (data?.admin_scopes ?? []),
     },
@@ -48,8 +50,9 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const { name, phone, password } = body ?? {};
-  const problem = findProfileProblem(name, phone);
+  const { name, phone, address, shippingAddress, password } = body ?? {};
+  const problem =
+    findProfileProblem(name, phone) ?? findAddressesProblem(address, shippingAddress);
   if (problem) {
     return errorResponse("INVALID_INPUT", problem, 400);
   }
@@ -62,7 +65,12 @@ export async function PATCH(request: Request) {
 
   const { error } = await createAdminClient()
     .from("profiles")
-    .update({ name: name.trim(), phone })
+    .update({
+      name: name.trim(),
+      phone,
+      address: address.trim(),
+      shipping_address: shippingAddress.trim(),
+    })
     .eq("id", user.id);
 
   if (error) {
